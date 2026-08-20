@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   "Sunset Glass" design system — warm orange → white, frosted glass, luxurious.
+   Tailwind v4 CSS-first theme. Tokens here generate utilities automatically
+   (e.g. --color-brand-500 => bg-brand-500 / text-brand-500, --font-display =>
+   font-display). Exact brand hues will be fine-tuned once the logo arrives.
+   ========================================================================== */
+@theme {
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: "Sora", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand — sunset orange scale */
+  --color-brand-50: #fff7ed;
+  --color-brand-100: #ffedd5;
+  --color-brand-200: #fed7aa;
+  --color-brand-300: #fdba74;
+  --color-brand-400: #fb923c;
+  --color-brand-500: #ff7a18;
+  --color-brand-600: #f4590a;
+  --color-brand-700: #c2410c;
+  --color-brand-800: #9a3412;
+  --color-brand-900: #7c2d12;
+
+  /* Warm neutrals + accents */
+  --color-ink: #1c1917;
+  --color-ink-soft: #6b6560;
+  --color-cream: #fff9f4;
+  --color-coral: #ff6b4a;
+  --color-amber: #ffa53b;
+  --color-peach: #ffd9b8;
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-cream text-ink font-sans;
+    margin: 0;
+    min-height: 100vh;
+  }
+  h1, h2, h3, h4 {
+    @apply font-display;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* --- Sunset Glass utilities ------------------------------------------------ */
+
+/* Frosted glass surface */
+@utility glass {
+  background: color-mix(in oklab, white 62%, transparent);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 10px 40px -12px rgba(244, 89, 10, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+/* Warm ambient aurora background (place behind glass) */
+@utility bg-aurora {
+  background-color: #fff9f4;
+  background-image:
+    radial-gradient(42rem 42rem at 12% 8%, rgba(255, 166, 59, 0.38), transparent 60%),
+    radial-gradient(38rem 38rem at 88% 14%, rgba(255, 107, 74, 0.32), transparent 60%),
+    radial-gradient(46rem 46rem at 50% 108%, rgba(255, 122, 24, 0.20), transparent 60%);
+}
+
+/* Signature brand gradient (CTAs / brand marks) */
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, #ffb25a 0%, #ff7a18 48%, #f4590a 100%);
+}
+
+/* Gradient text */
+@utility text-gradient {
+  background-image: linear-gradient(135deg, #ff8a00 0%, #f4590a 60%, #c2410c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}

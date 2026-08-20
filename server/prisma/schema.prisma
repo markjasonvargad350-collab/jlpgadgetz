@@ -1,0 +1,425 @@
+// ============================================================================
+//  iStore — Prisma schema (PostgreSQL)
+//  "Sunset Glass" iPhone e-commerce + inventory/order back-office.
+//
+//  Design principles baked into this schema:
+//   • Admin-only auth (Role/User). Customers check out as guests — no user row.
+//   • Money stored as DECIMAL(12,2) — never floats — to avoid rounding drift.
+//   • Stock NEVER changes without an InventoryTransaction (full audit trail).
+//     Order creation + stock deduction run inside one $transaction that
+//     re-reads stock and rejects oversell (see services in later phases).
+//   • Order line items SNAPSHOT product/variant/price so history survives
+//     later edits or archival of the catalog.
+//   • Variants with sales/inventory history cannot be hard-deleted
+//     (onDelete: Restrict) — the app archives via isActive/status instead.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ----------------------------------------------------------------------------
+//  Enums
+// ----------------------------------------------------------------------------
+
+enum ProductStatus {
+  DRAFT // not visible in the storefront
+  ACTIVE // published / buyable
+  ARCHIVED // hidden, kept for history
+}
+
+enum OrderStatus {
+  RECEIVED // order placed (default)
+  PROCESSING // being prepared
+  PACKED // packed, awaiting courier
+  SHIPPED // handed to courier
+  IN_TRANSIT // moving between hubs
+  OUT_FOR_DELIVERY // rider en route to customer
+  DELIVERED // completed
+  CANCELLED // cancelled (restocks inventory)
+}
+
+enum PaymentMethod {
+  COD // cash on delivery
+  GCASH // GCash e-wallet (simulated)
+  BANK_TRANSFER // bank transfer (simulated)
+}
+
+enum PaymentStatus {
+  PENDING // awaiting payment (COD before delivery)
+  PAID // confirmed
+  FAILED // attempt failed
+  REFUNDED // money returned (e.g. after cancellation)
+}
+
+enum ShipmentStatus {
+  PENDING // created with the order, not yet prepared
+  PREPARING // being packed at the warehouse
+  IN_TRANSIT // en route between hubs
+  OUT_FOR_DELIVERY // rider en route
+  DELIVERED // handed to customer
+  FAILED // delivery failed / returned
+}
+
+enum InventoryTxnType {
+  RESTOCK // stock added by admin
+  SALE // stock removed by a customer order
+  RETURN // stock added back from a return
+  ADJUSTMENT // manual correction (audit/count)
+  CANCELLATION // stock added back from a cancelled order
+}
+
+enum NotificationType {
+  NEW_ORDER
+  LOW_STOCK
+  OUT_OF_STOCK
+  PAYMENT
+  SYSTEM
+}
+
+enum NotificationLevel {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+// ----------------------------------------------------------------------------
+//  Auth / RBAC (admins only)
+// ----------------------------------------------------------------------------
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique // e.g. ADMIN, SUPER_ADMIN
+  description String?
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String // bcrypt hash — NEVER plaintext
+  name         String
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  inventoryTransactions InventoryTransaction[]
+  auditLogs             AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+}
+
+// ----------------------------------------------------------------------------
+//  Catalog
+// ----------------------------------------------------------------------------
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  imageUrl    String?
+  position    Int     @default(0) // display order
+  isActive    Boolean @default(true)
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model Product {
+  id           String        @id @default(cuid())
+  name         String
+  slug         String        @unique
+  brand        String        @default("Apple")
+  model        String? // e.g. "iPhone 15 Pro"
+  description  String // long-form marketing copy
+  highlights   String[] // bullet feature list
+  basePrice    Decimal       @db.Decimal(12, 2) // "from" price; variants may override
+  discountPct  Int           @default(0) // 0–100, storefront strike-through
+  status       ProductStatus @default(DRAFT)
+  isFeatured   Boolean       @default(false)
+  isNewArrival Boolean       @default(false)
+  isBestSeller Boolean       @default(false)
+  isDeal       Boolean       @default(false)
+  releaseYear  Int?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  images   ProductImage[]
+  variants ProductVariant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([isFeatured])
+  @@index([isBestSeller])
+  @@index([isNewArrival])
+  @@index([isDeal])
+}
+
+model ProductImage {
+  id       String  @id @default(cuid())
+  url      String
+  alt      String?
+  position Int     @default(0)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model ProductVariant {
+  id                String  @id @default(cuid())
+  sku               String  @unique // stock-keeping unit
+  storage           String // e.g. "128GB", "256GB", "1TB"
+  color             String // e.g. "Natural Titanium"
+  colorHex          String? // swatch color, e.g. "#8A8A8D"
+  price             Decimal @db.Decimal(12, 2)
+  stock             Int     @default(0) // on-hand, sellable
+  reservedStock     Int     @default(0) // held by in-flight orders
+  soldQty           Int     @default(0) // lifetime units sold (for best-seller sort)
+  lowStockThreshold Int     @default(5)
+  imageUrl          String?
+  isActive          Boolean @default(true)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  orderItems            OrderItem[]
+  inventoryTransactions InventoryTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // A given storage+color combo is unique within a product.
+  @@unique([productId, storage, color])
+  @@index([productId])
+  @@index([isActive])
+}
+
+// ----------------------------------------------------------------------------
+//  Orders (guest checkout — customer details captured inline)
+// ----------------------------------------------------------------------------
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique // ORD-YYYYMMDD-#### (human-facing)
+
+  // Guest customer snapshot (no User account for shoppers)
+  customerName  String
+  customerEmail String
+  customerPhone String
+
+  // Shipping address (Philippines)
+  addressLine String
+  barangay    String
+  city        String
+  province    String
+  postalCode  String
+  addressNote String?
+
+  // Money — computed server-side, never trusted from the client
+  subtotal    Decimal @db.Decimal(12, 2)
+  deliveryFee Decimal @default(0) @db.Decimal(12, 2)
+  discount    Decimal @default(0) @db.Decimal(12, 2)
+  total       Decimal @db.Decimal(12, 2)
+
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(PENDING)
+  status        OrderStatus   @default(RECEIVED)
+
+  items                 OrderItem[]
+  payment               Payment?
+  shipment              Shipment?
+  inventoryTransactions InventoryTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([customerEmail])
+  @@index([customerPhone])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id String @id @default(cuid())
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Nullable + SetNull so order history survives if a variant is later removed.
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  // Snapshots taken at purchase time (source of truth for this order forever)
+  productName  String
+  variantLabel String // e.g. "256GB · Natural Titanium"
+  sku          String
+  unitPrice    Decimal @db.Decimal(12, 2)
+  quantity     Int
+  lineTotal    Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+model Payment {
+  id String @id @default(cuid())
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  amount    Decimal       @db.Decimal(12, 2)
+  reference String? // gateway/txn reference (simulated)
+  paidAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------------------
+//  Fulfilment / simulated delivery
+// ----------------------------------------------------------------------------
+
+model Shipment {
+  id String @id @default(cuid())
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  status       ShipmentStatus @default(PENDING)
+  courier      String? // e.g. "iStore Express" (simulated)
+  trackingCode String?
+
+  // Simulated geo (Float lat/lng). SIMULATED — no real GPS. A real courier
+  // API can later populate current* without changing the rest of the model.
+  originLat        Float?
+  originLng        Float?
+  destLat          Float?
+  destLng          Float?
+  currentLat       Float?
+  currentLng       Float?
+  estimatedArrival DateTime?
+  deliveredAt      DateTime?
+
+  history TrackingHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TrackingHistory {
+  id String @id @default(cuid())
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  status OrderStatus // milestone this entry represents
+  note   String? // human-friendly description ("Departed Manila hub")
+  lat    Float?
+  lng    Float?
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------------------------------
+//  Inventory ledger — the ONLY way stock changes
+// ----------------------------------------------------------------------------
+
+model InventoryTransaction {
+  id String @id @default(cuid())
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  type            InventoryTxnType
+  previousStock   Int
+  quantityChanged Int // signed: +restock/return, -sale
+  newStock        Int
+  reason          String?
+
+  // Optional provenance
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  adminId String?
+  admin   User?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId])
+  @@index([type])
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------------------------------
+//  Ops: notifications + audit trail
+// ----------------------------------------------------------------------------
+
+model Notification {
+  id      String            @id @default(cuid())
+  type    NotificationType
+  level   NotificationLevel @default(INFO)
+  title   String
+  message String
+  isRead  Boolean           @default(false)
+
+  // Loose reference to the related entity (no hard FK — cross-entity)
+  entityType String?
+  entityId   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  adminId String?
+  admin   User?   @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  action     String // e.g. "product.update", "order.status.change"
+  entityType String
+  entityId   String?
+  meta       Json? // before/after or extra context
+  ip         String?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([entityType])
+  @@index([createdAt])
+}
