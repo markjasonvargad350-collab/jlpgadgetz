@@ -14,6 +14,10 @@ const envSchema = z
     JWT_EXPIRES_IN: z.string().default('7d'),
     ADMIN_EMAIL: z.string().default('admin@istore.test'),
     ADMIN_PASSWORD: z.string().min(8).default('ChangeMe123!'),
+    // A seeded STAFF demo account so the role system is real & demoable: STAFF
+    // may browse + advance fulfillment, but cancellation/refund is ADMIN-only.
+    STAFF_EMAIL: z.string().default('staff@istore.test'),
+    STAFF_PASSWORD: z.string().min(8).default('StaffPass123!'),
     DATABASE_URL: z.string().optional(),
   })
   .superRefine((val, ctx) => {

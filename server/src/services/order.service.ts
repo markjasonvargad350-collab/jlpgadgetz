@@ -1,4 +1,11 @@
-import { Prisma, ProductStatus, InventoryTxnType, OrderStatus, type PaymentMethod } from '@prisma/client';
+import {
+  Prisma,
+  ProductStatus,
+  InventoryTxnType,
+  OrderStatus,
+  type PaymentMethod,
+  type ShipmentStatus,
+} from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { ApiError } from '../utils/ApiError';
 import { money } from '../utils/money';
@@ -6,6 +13,7 @@ import { computeDeliveryFee } from '../config/order';
 import { recordInventoryChange } from './inventory.service';
 import { paymentProvider, paymentInstructions } from './payment.service';
 import { logAudit } from './audit.service';
+import { manilaDateStamp } from '../utils/time';
 
 // ── Inputs (already validated + coerced by the order validator) ──────────────
 
@@ -30,19 +38,6 @@ export interface CreateOrderInput {
 
 // ── Order-number generation ──────────────────────────────────────────────────
 
-/** YYYYMMDD in Asia/Manila, regardless of the server's own timezone. */
-function manilaDateStamp(now: Date): string {
-  // en-CA renders as YYYY-MM-DD; strip the dashes.
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .format(now)
-    .replace(/-/g, '');
-}
-
 /**
  * Next human-facing order number for today: ORD-YYYYMMDD-####. Sequence is the
  * count of today's orders + 1. Computed inside the transaction; a rare race
@@ -58,7 +53,7 @@ async function nextOrderNumber(tx: Prisma.TransactionClient, now: Date): Promise
 
 // ── DTO shaping (Decimal → number for the client) ────────────────────────────
 
-const orderInclude = {
+export const orderInclude = {
   items: {
     orderBy: { createdAt: 'asc' },
     include: {
@@ -71,6 +66,8 @@ const orderInclude = {
     },
   },
   payment: true,
+  // Fulfillment + tracking timeline (admin detail; guest lookup ignores it).
+  shipment: { include: { history: { orderBy: { createdAt: 'asc' } } } },
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -105,9 +102,19 @@ export interface OrderDTO {
   discount: number;
   total: number;
   payment: { reference: string | null; instructions: string };
+  updatedAt: string;
+  /** Fulfillment + tracking timeline. Present once a shipment exists; null otherwise. */
+  shipment: {
+    status: ShipmentStatus;
+    courier: string | null;
+    trackingCode: string | null;
+    estimatedArrival: string | null;
+    deliveredAt: string | null;
+    history: { status: OrderStatus; note: string | null; createdAt: string }[];
+  } | null;
 }
 
-function toOrderDTO(o: OrderRow): OrderDTO {
+export function toOrderDTO(o: OrderRow): OrderDTO {
   return {
     orderNumber: o.orderNumber,
     status: o.status,
@@ -142,6 +149,21 @@ function toOrderDTO(o: OrderRow): OrderDTO {
       reference: o.payment?.reference ?? null,
       instructions: paymentInstructions(o.paymentMethod, o.total.toNumber()),
     },
+    updatedAt: o.updatedAt.toISOString(),
+    shipment: o.shipment
+      ? {
+          status: o.shipment.status,
+          courier: o.shipment.courier,
+          trackingCode: o.shipment.trackingCode,
+          estimatedArrival: o.shipment.estimatedArrival?.toISOString() ?? null,
+          deliveredAt: o.shipment.deliveredAt?.toISOString() ?? null,
+          history: o.shipment.history.map((h) => ({
+            status: h.status,
+            note: h.note,
+            createdAt: h.createdAt.toISOString(),
+          })),
+        }
+      : null,
   };
 }
 
@@ -335,6 +357,19 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
 
 async function loadOrderById(id: string): Promise<OrderDTO> {
   const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: orderInclude });
+  return toOrderDTO(order);
+}
+
+/**
+ * Load a full order DTO by its human-facing number, with NO email/PII guard.
+ * For **session-gated admin** use only (the guest route keeps `getOrderForGuest`,
+ * which additionally requires the customer's email to match).
+ */
+export async function loadOrderDTOByNumber(orderNumber: string): Promise<OrderDTO> {
+  const order = await prisma.order.findUnique({ where: { orderNumber }, include: orderInclude });
+  if (!order) {
+    throw ApiError.notFound('Order not found');
+  }
   return toOrderDTO(order);
 }
 

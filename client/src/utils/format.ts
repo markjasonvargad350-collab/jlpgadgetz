@@ -13,3 +13,46 @@ export function formatPHP(amount: number): string {
 export function formatPriceRange(from: number, to: number): string {
   return from === to ? formatPHP(from) : `${formatPHP(from)} – ${formatPHP(to)}`;
 }
+
+// ── Dates ────────────────────────────────────────────────────────────────────
+// All admin dates render in Philippine time. PH observes no DST, so Asia/Manila
+// is a fixed +08:00 — bucketing and display always agree. Inputs may be an ISO
+// string (the JSON wire form), a Date, or an epoch.
+
+type DateInput = string | number | Date;
+
+const dateFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+const dateTimeFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+const dateShortFmt = new Intl.DateTimeFormat('en-PH', {
+  timeZone: 'Asia/Manila',
+  month: 'short',
+  day: 'numeric',
+});
+
+/** e.g. "20 Aug 2026". */
+export function formatDate(input: DateInput): string {
+  return dateFmt.format(new Date(input));
+}
+
+/** e.g. "20 Aug 2026, 3:45 PM". */
+export function formatDateTime(input: DateInput): string {
+  return dateTimeFmt.format(new Date(input));
+}
+
+/** Compact axis/tick label, e.g. "20 Aug". */
+export function formatDateShort(input: DateInput): string {
+  return dateShortFmt.format(new Date(input));
+}

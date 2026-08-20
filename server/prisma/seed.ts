@@ -401,7 +401,9 @@ async function main() {
   const adminRole = await prisma.role.create({
     data: { name: 'ADMIN', description: 'Full back-office access' },
   });
-  await prisma.role.create({ data: { name: 'STAFF', description: 'Limited back-office access' } });
+  const staffRole = await prisma.role.create({
+    data: { name: 'STAFF', description: 'Limited back-office access' },
+  });
 
   const passwordHash = await bcrypt.hash(env.ADMIN_PASSWORD, 12);
   const admin = await prisma.user.create({
@@ -413,6 +415,19 @@ async function main() {
     },
   });
   console.log(`   ✓ Admin user: ${admin.email}`);
+
+  // Staff demo account — exercises the role gate: STAFF can browse + advance
+  // fulfillment, but cancellation/refund (destructive/financial) is ADMIN-only.
+  const staffPasswordHash = await bcrypt.hash(env.STAFF_PASSWORD, 12);
+  const staff = await prisma.user.create({
+    data: {
+      email: env.STAFF_EMAIL,
+      passwordHash: staffPasswordHash,
+      name: 'Store Staff',
+      roleId: staffRole.id,
+    },
+  });
+  console.log(`   ✓ Staff user: ${staff.email}`);
 
   // --- Categories -----------------------------------------------------------
   const categoryDefs = [

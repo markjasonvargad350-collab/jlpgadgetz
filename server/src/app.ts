@@ -13,6 +13,8 @@ import productRouter from './routes/product.routes';
 import categoryRouter from './routes/category.routes';
 import adminProductRouter from './routes/admin.product.routes';
 import adminInventoryRouter from './routes/admin.inventory.routes';
+import adminOrderRouter from './routes/admin.order.routes';
+import adminReportRouter from './routes/admin.report.routes';
 import orderRouter from './routes/order.routes';
 
 /**
@@ -70,9 +72,12 @@ export function createApp(): Application {
 
   // ── Feature routers ──
   // Auth is mounted first so /api/admin/auth/* resolves before the catch-all
-  // /api/admin catalog router below.
+  // /api/admin catalog router below. Likewise /inventory, /orders and /reports
+  // are mounted before /api/admin so their specific paths win over the catalog router.
   app.use('/api/admin/auth', authRouter);
   app.use('/api/admin/inventory', adminInventoryRouter);
+  app.use('/api/admin/orders', adminOrderRouter);
+  app.use('/api/admin/reports', adminReportRouter);
   app.use('/api/admin', adminProductRouter);
   app.use('/api/products', productRouter);
   app.use('/api/categories', categoryRouter);

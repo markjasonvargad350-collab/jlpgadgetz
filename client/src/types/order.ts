@@ -16,6 +16,15 @@ export type OrderStatus =
 
 export type PaymentStatus = 'PENDING' | 'PAID' | 'FAILED' | 'REFUNDED';
 
+/** Shipment lifecycle (distinct from OrderStatus; Phase 9 drives it live). */
+export type ShipmentStatus =
+  | 'PENDING'
+  | 'PREPARING'
+  | 'IN_TRANSIT'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'FAILED';
+
 /** Contact + shipping details collected at checkout. */
 export interface CheckoutCustomer {
   name: string;
@@ -55,6 +64,26 @@ export interface OrderItemDTO {
   lineTotal: number;
 }
 
+/** One recorded step in an order's fulfillment history (append-only). */
+export interface TrackingEntry {
+  status: OrderStatus;
+  note: string | null;
+  createdAt: string;
+}
+
+/**
+ * Shipment snapshot attached to an order. `status` follows ShipmentStatus, which
+ * is driven live in Phase 9; for now history mirrors the order's fulfillment.
+ */
+export interface ShipmentDTO {
+  status: ShipmentStatus;
+  courier: string | null;
+  trackingCode: string | null;
+  estimatedArrival: string | null;
+  deliveredAt: string | null;
+  history: TrackingEntry[];
+}
+
 export interface OrderDTO {
   orderNumber: string;
   status: OrderStatus;
@@ -76,6 +105,8 @@ export interface OrderDTO {
   discount: number;
   total: number;
   payment: { reference: string | null; instructions: string };
+  updatedAt: string;
+  shipment: ShipmentDTO | null;
 }
 
 /** Shape of the 409 `details` payload when an item is out of stock at checkout. */
