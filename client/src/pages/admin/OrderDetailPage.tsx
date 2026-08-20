@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Ban, Clock, CreditCard, MapPin, Smartphone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ban, CreditCard, MapPin, Pencil, Save, Smartphone, Truck } from 'lucide-react';
 import { useAdminOrder } from '../../hooks/useAdminOrder';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { updateOrderStatus } from '../../services/adminOrders';
+import { updateShipment, type ShipmentUpdate } from '../../services/adminShipments';
 import { ApiError } from '../../services/http';
 import { PageHeader } from '../../components/admin/ui/PageHeader';
 import { Spinner, PageLoader } from '../../components/admin/ui/Spinner';
 import { OrderStatusBadge, PaymentStatusBadge } from '../../components/admin/ui/StatusBadge';
 import { ConfirmDialog } from '../../components/admin/ui/ConfirmDialog';
-import { formatPHP, formatDate, formatDateTime } from '../../utils/format';
-import type { OrderStatus, PaymentMethod } from '../../types/order';
+import { TrackingTimelineCard } from '../../components/tracking/TrackingTimeline';
+import { formatPHP, formatDate, formatDateTime, toDateInputValue } from '../../utils/format';
+import type { OrderStatus, PaymentMethod, ShipmentDTO } from '../../types/order';
+
+// Code-split: Leaflet + the map chunk load only when an order detail is opened.
+const TrackingMap = lazy(() => import('../../components/tracking/TrackingMap'));
 
 // Client mirror of the server's ALLOWED_TRANSITIONS forward step. The single
 // legal next state per status; absent = terminal (DELIVERED / CANCELLED). The
@@ -52,6 +58,164 @@ function BackLink() {
   );
 }
 
+function MapFallback() {
+  return (
+    <div className="grid h-80 place-items-center rounded-3xl bg-white/50 ring-1 ring-white/60">
+      <span className="flex items-center gap-2 text-sm text-ink-soft">
+        <Spinner size={16} /> Loading map…
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Shipment facts plus an ADMIN-only inline editor for the human-managed fields
+ * (courier / tracking code / ETA). Shipment **status** and **coordinates** are
+ * owned by the fulfillment state-machine (advancing the order moves them) and
+ * are deliberately not editable here. Saving PATCHes the shipment then reloads
+ * the order so the facts + map reflect the change.
+ */
+function ShipmentCard({
+  shipment,
+  orderNumber,
+  isAdmin,
+  onSaved,
+}: {
+  shipment: ShipmentDTO;
+  orderNumber: string;
+  isAdmin: boolean;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [courier, setCourier] = useState('');
+  const [trackingCode, setTrackingCode] = useState('');
+  const [eta, setEta] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function startEdit() {
+    setCourier(shipment.courier ?? '');
+    setTrackingCode(shipment.trackingCode ?? '');
+    setEta(shipment.estimatedArrival ? toDateInputValue(shipment.estimatedArrival) : '');
+    setErr(null);
+    setEditing(true);
+  }
+
+  // Only send non-empty fields (the schema forbids blanks and requires ≥1).
+  const patch: ShipmentUpdate = {};
+  if (courier.trim()) patch.courier = courier.trim();
+  if (trackingCode.trim()) patch.trackingCode = trackingCode.trim();
+  if (eta) patch.estimatedArrival = eta;
+  const nothingToSave = Object.keys(patch).length === 0;
+
+  async function save() {
+    if (nothingToSave || saving) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await updateShipment(orderNumber, patch);
+      setEditing(false);
+      onSaved();
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not update the shipment.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputCls =
+    'w-full rounded-xl border border-white/70 bg-white/70 px-3 py-2 text-sm text-ink outline-none transition-shadow placeholder:text-ink-soft/70 focus:border-brand-300 focus:ring-2 focus:ring-brand-200';
+
+  return (
+    <section className="glass rounded-3xl p-6 text-sm">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+          <Truck size={18} className="text-brand-600" /> Shipment
+        </h2>
+        {isAdmin && !editing && (
+          <button
+            onClick={startEdit}
+            className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5 text-xs font-semibold text-ink-soft ring-1 ring-white/70 transition-colors hover:bg-white hover:text-ink"
+          >
+            <Pencil size={13} /> Edit
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        <dl className="mt-3 space-y-2">
+          <div className="flex justify-between gap-4">
+            <dt className="text-ink-soft">Courier</dt>
+            <dd className="font-semibold text-ink">{shipment.courier ?? '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-ink-soft">Tracking</dt>
+            <dd className="font-mono text-ink">{shipment.trackingCode ?? '—'}</dd>
+          </div>
+          <div className="flex justify-between gap-4">
+            <dt className="text-ink-soft">Est. arrival</dt>
+            <dd className="font-semibold text-ink">
+              {shipment.estimatedArrival ? formatDate(shipment.estimatedArrival) : '—'}
+            </dd>
+          </div>
+          {shipment.deliveredAt && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-soft">Delivered</dt>
+              <dd className="font-semibold text-emerald-600">{formatDateTime(shipment.deliveredAt)}</dd>
+            </div>
+          )}
+        </dl>
+      ) : (
+        <div className="mt-4 flex flex-col gap-3">
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-ink-soft">Courier</span>
+            <input
+              value={courier}
+              onChange={(e) => setCourier(e.target.value)}
+              maxLength={80}
+              placeholder="iStore Express"
+              className={inputCls}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-ink-soft">Tracking code</span>
+            <input
+              value={trackingCode}
+              onChange={(e) => setTrackingCode(e.target.value)}
+              maxLength={80}
+              placeholder="IEX…"
+              className={`${inputCls} font-mono`}
+            />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs font-semibold text-ink-soft">Est. arrival</span>
+            <input type="date" value={eta} onChange={(e) => setEta(e.target.value)} className={inputCls} />
+          </label>
+
+          {err && <p role="alert" className="text-xs text-coral">{err}</p>}
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={save}
+              disabled={nothingToSave || saving}
+              className="flex items-center gap-1.5 rounded-full brand-gradient px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100"
+            >
+              {saving ? <Spinner size={14} tone="light" /> : <Save size={14} />} Save
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="rounded-full bg-white/70 px-4 py-2 text-sm font-semibold text-ink-soft ring-1 ring-white/70 transition-colors hover:bg-white hover:text-ink disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function OrderDetailPage() {
   const { orderNumber } = useParams<{ orderNumber: string }>();
   const { isAdmin } = useAdminAuth();
@@ -60,6 +224,8 @@ export function OrderDetailPage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useDocumentTitle(order ? `Order ${order.orderNumber}` : 'Order');
 
   if (loading && !order) return <PageLoader label="Loading order…" />;
   if (error || !order) {
@@ -145,7 +311,15 @@ export function OrderDetailPage() {
       />
 
       {actionError && (
-        <div className="mb-6 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{actionError}</div>
+        <div role="alert" className="mb-6 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{actionError}</div>
+      )}
+
+      {order.shipment && (
+        <div className="mb-6">
+          <Suspense fallback={<MapFallback />}>
+            <TrackingMap shipment={order.shipment} />
+          </Suspense>
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -205,39 +379,8 @@ export function OrderDetailPage() {
             </div>
           </section>
 
-          {/* Fulfillment timeline */}
-          <section className="glass rounded-3xl p-6">
-            <h2 className="flex items-center gap-2 font-display text-lg font-bold">
-              <Clock size={18} className="text-brand-600" /> Fulfillment timeline
-            </h2>
-            {history.length === 0 ? (
-              <p className="mt-3 text-sm text-ink-soft">
-                No status changes recorded yet. The order is currently{' '}
-                <span className="font-semibold text-ink">{ORDER_STATUS_LABEL[order.status]}</span>.
-              </p>
-            ) : (
-              <ol className="mt-4 space-y-4">
-                {history.map((h, i) => {
-                  const isLast = i === history.length - 1;
-                  return (
-                    <li key={`${h.status}-${h.createdAt}`} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <span
-                          className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${isLast ? 'bg-brand-500 ring-4 ring-brand-500/20' : 'bg-ink-soft/40'}`}
-                        />
-                        {!isLast && <span className="mt-1 w-px flex-1 bg-white/70" />}
-                      </div>
-                      <div className="-mt-0.5 pb-1">
-                        <p className="text-sm font-semibold text-ink">{ORDER_STATUS_LABEL[h.status]}</p>
-                        {h.note && <p className="text-xs text-ink-soft">{h.note}</p>}
-                        <p className="text-xs text-ink-soft">{formatDateTime(h.createdAt)}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </section>
+          {/* Fulfillment timeline (shared with the customer track view) */}
+          <TrackingTimelineCard history={history} currentStatus={order.status} />
         </div>
 
         {/* Customer + payment */}
@@ -281,23 +424,13 @@ export function OrderDetailPage() {
             </p>
           </section>
 
-          {order.shipment && (order.shipment.courier || order.shipment.trackingCode) && (
-            <section className="glass rounded-3xl p-6 text-sm">
-              <h2 className="font-display text-lg font-bold">Shipment</h2>
-              {order.shipment.courier && (
-                <p className="mt-2 text-ink-soft">
-                  Courier: <span className="font-semibold text-ink">{order.shipment.courier}</span>
-                </p>
-              )}
-              {order.shipment.trackingCode && (
-                <p className="mt-1 text-ink-soft">
-                  Tracking: <span className="font-mono text-ink">{order.shipment.trackingCode}</span>
-                </p>
-              )}
-              {order.shipment.estimatedArrival && (
-                <p className="mt-1 text-ink-soft">Est. arrival: {formatDate(order.shipment.estimatedArrival)}</p>
-              )}
-            </section>
+          {order.shipment && (
+            <ShipmentCard
+              shipment={order.shipment}
+              orderNumber={order.orderNumber}
+              isAdmin={isAdmin}
+              onSaved={reload}
+            />
           )}
         </aside>
       </div>

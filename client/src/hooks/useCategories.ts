@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listCategories } from '../services/categories';
 import type { Category } from '../types/api';
 
@@ -8,12 +8,14 @@ interface UseCategoriesState {
   error: string | null;
 }
 
-/** Fetch active categories once on mount. */
-export function useCategories(): UseCategoriesState {
+/** Fetch active categories on mount, with a `reload` for retry-on-error. */
+export function useCategories(): UseCategoriesState & { reload: () => void } {
   const [state, setState] = useState<UseCategoriesState>({ data: [], loading: true, error: null });
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setState((s) => ({ ...s, loading: true, error: null }));
     listCategories()
       .then((data) => {
         if (active) setState({ data, loading: false, error: null });
@@ -24,7 +26,9 @@ export function useCategories(): UseCategoriesState {
     return () => {
       active = false;
     };
-  }, []);
+  }, [nonce]);
 
-  return state;
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  return { ...state, reload };
 }

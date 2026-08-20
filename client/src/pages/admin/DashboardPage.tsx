@@ -16,6 +16,7 @@ import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { useInventoryStats } from '../../hooks/useInventoryStats';
 import { useAdminOrders } from '../../hooks/useAdminOrders';
 import { useReportsSummary } from '../../hooks/useReportsSummary';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { PageHeader } from '../../components/admin/ui/PageHeader';
 import { StatTile } from '../../components/admin/ui/StatTile';
 import { OrderStatusBadge } from '../../components/admin/ui/StatusBadge';
@@ -64,7 +65,7 @@ function RecentOrders() {
     );
   }
   if (error) {
-    return <p className="mt-6 text-center text-sm text-coral">{error}</p>;
+    return <p role="alert" className="mt-6 text-center text-sm text-coral">{error}</p>;
   }
   if (orders.length === 0) {
     return (
@@ -110,7 +111,7 @@ function SalesOverview() {
   const { data, loading, error } = useReportsSummary();
 
   if (loading) return <div className="mt-4 h-40 animate-pulse rounded-2xl bg-white/50" />;
-  if (error) return <p className="mt-6 text-center text-sm text-coral">{error}</p>;
+  if (error) return <p role="alert" className="mt-6 text-center text-sm text-coral">{error}</p>;
   if (!data) return null;
 
   const { revenue, orders } = data.kpis.last30Days;
@@ -149,13 +150,14 @@ export function DashboardPage() {
   const { admin } = useAdminAuth();
   const { data: stats, loading, error } = useInventoryStats();
   const needsAttention = (stats?.low ?? 0) + (stats?.out ?? 0);
+  useDocumentTitle('Dashboard');
 
   return (
     <div>
       <PageHeader title="Dashboard" subtitle={admin ? `Welcome back, ${admin.name.split(' ')[0]}.` : undefined} />
 
       {error && (
-        <div className="mb-6 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{error}</div>
+        <div role="alert" className="mb-6 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{error}</div>
       )}
 
       {/* stat tiles */}

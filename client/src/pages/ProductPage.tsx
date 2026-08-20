@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useProduct } from '../hooks/useProduct';
 import { useCart } from '../contexts/CartContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
 import type { ProductColor, ProductVariant } from '../types/api';
 
@@ -44,16 +45,27 @@ export function ProductPage() {
   const storages = useMemo(() => uniqueStorages(product?.variants ?? []), [product]);
   const colors = useMemo(() => uniqueColors(product?.variants ?? []), [product]);
 
+  useDocumentTitle(product?.name);
+
   if (loading) return <ProductSkeleton />;
-  if (notFound || !product) return <ProductMissing />;
-  if (error) {
+  // A genuine load failure (non-404) must be shown as an error — checked BEFORE
+  // the `!product` guard, which would otherwise misreport every failure as "not
+  // found" (the hook sets `notFound` only on a real 404).
+  if (error && !notFound) {
     return (
-      <div className={`${WIDTH} py-20 text-center`}>
+      <div className={`${WIDTH} py-20 text-center`} role="alert" aria-live="assertive">
         <p className="text-lg font-semibold">Couldn’t load this product</p>
         <p className="mt-1 text-sm text-ink-soft">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-6 inline-flex items-center gap-2 rounded-full brand-gradient px-6 py-3 font-semibold text-white"
+        >
+          Try again
+        </button>
       </div>
     );
   }
+  if (notFound || !product) return <ProductMissing />;
 
   const variants = product.variants;
   const selected: ProductVariant | null =
@@ -162,7 +174,7 @@ export function ProductPage() {
                   }`}
                   aria-label={`View image ${i + 1}`}
                 >
-                  <img src={img.url} alt={img.alt} className="h-full w-full object-cover" />
+                  <img src={img.url} alt={img.alt} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>

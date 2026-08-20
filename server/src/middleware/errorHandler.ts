@@ -9,7 +9,17 @@ import { isProd } from '../config/env';
  * Central error handler. Must be registered last. Translates known error types
  * into clean JSON; hides internals in production.
  */
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+export function errorHandler(err: unknown, req: Request, res: Response, next: NextFunction) {
+  // If the response already started streaming, we can't rewrite status/body —
+  // hand off to Express's built-in finalizer.
+  if (res.headersSent) return next(err);
+
+  // An error response must never be cached, even on an otherwise-public route
+  // that set `Cache-Control: public` before the handler threw.
+  res.setHeader('Cache-Control', 'no-store');
+
+  const ctx = { id: req.id, method: req.method, path: req.originalUrl };
+
   // Validation errors (from zod schemas)
   if (err instanceof ZodError) {
     return res.status(422).json({
@@ -18,6 +28,8 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   if (err instanceof ApiError) {
+    // Only server-fault (5xx) ApiErrors are worth logging; 4xx are client input.
+    if (err.statusCode >= 500) logger.error('ApiError', { ...ctx, code: err.code, message: err.message });
     return res.status(err.statusCode).json({
       error: { message: err.message, code: err.code, ...(err.details ? { details: err.details } : {}) },
     });
@@ -27,13 +39,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   // Prisma message, which can include column/constraint internals).
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === 'P2002') {
-      const target = err.meta?.target;
+      // Do NOT echo err.meta.target — the offending unique column name is
+      // internal detail we don't disclose to clients.
       return res.status(409).json({
-        error: {
-          message: 'A record with these unique values already exists',
-          code: 'DUPLICATE',
-          ...(target ? { details: { target } } : {}),
-        },
+        error: { message: 'A record with these unique values already exists', code: 'DUPLICATE' },
       });
     }
     if (err.code === 'P2025') {
@@ -47,7 +56,7 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
 
   // Unknown / unexpected error
-  logger.error(err);
+  logger.error('Unhandled error', ctx, err);
   const message = isProd ? 'Internal server error' : (err as Error)?.message ?? 'Unknown error';
   return res.status(500).json({ error: { message, code: 'INTERNAL_ERROR' } });
 }

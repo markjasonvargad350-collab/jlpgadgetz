@@ -46,7 +46,9 @@ export function AdminTopbar({ onMenu }: { onMenu: () => void }) {
         <Menu size={18} />
       </button>
 
-      <h2 className="font-display text-lg font-bold">{title}</h2>
+      {/* Visual echo of the page's own <h1> (from PageHeader). Hidden from the
+          a11y tree so it neither duplicates the heading nor breaks heading order. */}
+      <span aria-hidden="true" className="font-display text-lg font-bold">{title}</span>
 
       <div className="ml-auto flex items-center gap-2">
         <Link

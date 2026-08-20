@@ -17,6 +17,8 @@ import {
 import type { ComponentType } from 'react';
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { SPRING_EASE } from '../utils/motion';
 import { ProductGrid } from '../components/store/ProductGrid';
 import { SectionHeading } from '../components/store/SectionHeading';
 import type { ProductListParams } from '../types/api';
@@ -31,6 +33,7 @@ const CATEGORY_ICON: Record<string, ComponentType<{ size?: number; className?: s
 };
 
 export function HomePage() {
+  useDocumentTitle();
   return (
     <div className="flex flex-col gap-16 pb-4">
       <Hero />
@@ -130,7 +133,7 @@ function TrustStrip() {
 /* ── Shop by category ────────────────────────────────────────────────────── */
 
 function ShopByCategory() {
-  const { data, loading } = useCategories();
+  const { data, loading, error, reload } = useCategories();
 
   return (
     <section className={WIDTH}>
@@ -140,6 +143,16 @@ function ShopByCategory() {
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="glass h-32 animate-pulse rounded-3xl" />
           ))}
+        </div>
+      ) : error ? (
+        <div className="glass flex flex-wrap items-center justify-between gap-3 rounded-3xl p-6" role="alert">
+          <p className="text-sm text-ink-soft">{error}</p>
+          <button
+            onClick={reload}
+            className="rounded-full brand-gradient px-4 py-2 text-sm font-semibold text-white"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -304,7 +317,7 @@ function Faq() {
               <motion.div
                 initial={false}
                 animate={{ height: isOpen ? 'auto' : 0, opacity: isOpen ? 1 : 0 }}
-                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.25, ease: SPRING_EASE }}
                 className="overflow-hidden"
               >
                 <p className="px-6 pb-5 text-sm text-ink-soft">{f.a}</p>

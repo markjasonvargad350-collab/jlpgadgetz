@@ -14,6 +14,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
 import { estimateDeliveryFee, FREE_DELIVERY_THRESHOLD } from '../config/order';
 import { createOrder } from '../services/orders';
@@ -148,13 +149,18 @@ function Field({
         autoComplete={autoComplete}
         inputMode={inputMode}
         aria-invalid={!!error}
+        aria-describedby={error ? `${name}-error` : undefined}
         className={`w-full rounded-2xl border bg-white/70 px-4 py-3 text-sm outline-none transition-shadow placeholder:text-ink-soft/70 focus:ring-2 ${
           error
             ? 'border-coral/60 focus:ring-coral/30'
             : 'border-white/70 focus:border-brand-300 focus:ring-brand-200'
         }`}
       />
-      {error && <span className="mt-1 block text-xs font-medium text-coral">{error}</span>}
+      {error && (
+        <span id={`${name}-error`} role="alert" className="mt-1 block text-xs font-medium text-coral">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
@@ -164,6 +170,7 @@ function Field({
 export function CheckoutPage() {
   const { items, subtotal, count, setQuantity, removeItem, clear } = useCart();
   const navigate = useNavigate();
+  useDocumentTitle('Checkout');
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
@@ -383,7 +390,7 @@ export function CheckoutPage() {
               <li key={item.variantId} className="flex gap-3">
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/60">
                   {item.image ? (
-                    <img src={item.image} alt={item.productName} className="h-full w-full object-cover" />
+                    <img src={item.image} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={20} className="text-brand-300" />
                   )}

@@ -11,43 +11,24 @@ import {
   PackageSearch,
   Receipt,
   Smartphone,
+  Truck,
 } from 'lucide-react';
-import { formatPHP } from '../utils/format';
+import { formatPHP, formatDateTime } from '../utils/format';
 import { getOrder } from '../services/orders';
 import { ApiError } from '../services/http';
-import type { OrderDTO, OrderStatus, PaymentMethod, PaymentStatus } from '../types/order';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { TrackingTimeline } from '../components/tracking/TrackingTimeline';
+import { PaymentStatusBadge } from '../components/admin/ui/StatusBadge';
+import { SPRING_EASE } from '../utils/motion';
+import type { OrderDTO, PaymentMethod } from '../types/order';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
-
-const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
-  RECEIVED: 'Order received',
-  PROCESSING: 'Processing',
-  PACKED: 'Packed',
-  SHIPPED: 'Shipped',
-  IN_TRANSIT: 'In transit',
-  OUT_FOR_DELIVERY: 'Out for delivery',
-  DELIVERED: 'Delivered',
-  CANCELLED: 'Cancelled',
-};
 
 const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   COD: 'Cash on Delivery',
   GCASH: 'GCash',
   BANK_TRANSFER: 'Bank Transfer',
 };
-
-const PAYMENT_STATUS_BADGE: Record<PaymentStatus, { label: string; cls: string }> = {
-  PENDING: { label: 'Pending', cls: 'bg-amber-100 text-amber-700' },
-  PAID: { label: 'Paid', cls: 'bg-emerald-100 text-emerald-700' },
-  FAILED: { label: 'Failed', cls: 'bg-red-100 text-red-700' },
-  REFUNDED: { label: 'Refunded', cls: 'bg-stone-200 text-stone-600' },
-};
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
-}
 
 export function OrderConfirmationPage() {
   const { orderNumber = '' } = useParams();
@@ -62,6 +43,8 @@ export function OrderConfirmationPage() {
 
   // Whether we arrived fresh from checkout (show celebratory hero) or via lookup.
   const cameFromCheckout = initial !== null;
+
+  useDocumentTitle(order ? `Order ${order.orderNumber}` : 'Look up your order');
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
@@ -109,17 +92,23 @@ export function OrderConfirmationPage() {
           </p>
 
           <form onSubmit={lookup} className="mt-6 flex flex-col gap-3" noValidate>
-            <input
-              type="email"
-              inputMode="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              className="w-full rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm outline-none transition-shadow placeholder:text-ink-soft/70 focus:border-brand-300 focus:ring-2 focus:ring-brand-200"
-            />
+            <div>
+              <label htmlFor="lookup-email" className="mb-1.5 block text-sm font-semibold text-ink">
+                Email used at checkout
+              </label>
+              <input
+                id="lookup-email"
+                type="email"
+                inputMode="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="w-full rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm outline-none transition-shadow placeholder:text-ink-soft/70 focus:border-brand-300 focus:ring-2 focus:ring-brand-200"
+              />
+            </div>
             {error && (
-              <p className="flex items-center gap-2 text-sm text-coral">
+              <p role="alert" className="flex items-center gap-2 text-sm text-coral">
                 <AlertCircle size={15} /> {error}
               </p>
             )}
@@ -149,15 +138,13 @@ export function OrderConfirmationPage() {
   }
 
   // ── Order loaded → confirmation / details ──
-  const payBadge = PAYMENT_STATUS_BADGE[order.paymentStatus];
-
   return (
     <div className={`${WIDTH} pt-10 pb-16`}>
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.4, ease: SPRING_EASE }}
         className="glass rounded-3xl p-8 text-center sm:p-10"
       >
         <motion.span
@@ -189,9 +176,6 @@ export function OrderConfirmationPage() {
             {copied ? <CheckCircle2 size={15} className="text-emerald-600" /> : <Copy size={14} />}
           </button>
         </div>
-        <p className="mt-3 text-xs text-ink-soft">
-          Status: <span className="font-semibold text-ink">{ORDER_STATUS_LABEL[order.status]}</span>
-        </p>
       </motion.div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_22rem]">
@@ -203,7 +187,7 @@ export function OrderConfirmationPage() {
               <li key={it.sku} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                 <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/60">
                   {it.image ? (
-                    <img src={it.image} alt={it.productName} className="h-full w-full object-cover" />
+                    <img src={it.image} alt={it.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={24} className="text-brand-300" />
                   )}
@@ -279,9 +263,7 @@ export function OrderConfirmationPage() {
             <h2 className="font-display text-lg font-bold">Payment</h2>
             <div className="mt-3 flex items-center justify-between text-sm">
               <span className="font-semibold">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</span>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${payBadge.cls}`}>
-                {payBadge.label}
-              </span>
+              <PaymentStatusBadge status={order.paymentStatus} />
             </div>
             {order.payment.reference && (
               <p className="mt-2 text-xs text-ink-soft">
@@ -291,6 +273,25 @@ export function OrderConfirmationPage() {
             <p className="mt-3 rounded-xl bg-white/60 p-3 text-xs leading-relaxed text-ink-soft">
               {order.payment.instructions}
             </p>
+          </section>
+
+          <section className="glass rounded-3xl p-6">
+            <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+              <Truck size={18} className="text-brand-600" /> Delivery
+            </h2>
+            <div className="mt-4">
+              <TrackingTimeline
+                history={order.shipment?.history ?? []}
+                currentStatus={order.status}
+                compact
+              />
+            </div>
+            <Link
+              to={`/track-order?order=${encodeURIComponent(order.orderNumber)}`}
+              className="mt-5 flex items-center justify-center gap-2 rounded-full brand-gradient px-5 py-2.5 text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
+            >
+              <MapPin size={15} /> Track delivery
+            </Link>
           </section>
         </aside>
       </div>

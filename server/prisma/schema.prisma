@@ -174,6 +174,13 @@ model Product {
   @@index([isBestSeller])
   @@index([isNewArrival])
   @@index([isDeal])
+  // Catalog hot paths: the public list always filters status=ACTIVE and, by
+  // default, orders by createdAt; the other composites back the sortable
+  // columns (price / name / release year).
+  @@index([status, createdAt])
+  @@index([basePrice])
+  @@index([name])
+  @@index([releaseYear])
 }
 
 model ProductImage {
@@ -217,6 +224,10 @@ model ProductVariant {
   @@unique([productId, storage, color])
   @@index([productId])
   @@index([isActive])
+  // Back the inventory status filters (low/out) and catalog price / in-stock
+  // predicates that scan variants directly.
+  @@index([stock])
+  @@index([price])
 }
 
 // ----------------------------------------------------------------------------

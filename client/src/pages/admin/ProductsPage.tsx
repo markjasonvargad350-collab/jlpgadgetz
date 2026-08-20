@@ -4,6 +4,7 @@ import { ImageOff, Plus, SlidersHorizontal } from 'lucide-react';
 import { useAdminProducts } from '../../hooks/useAdminProducts';
 import { useCategories } from '../../hooks/useCategories';
 import { useDebounce } from '../../hooks/useDebounce';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { PageHeader } from '../../components/admin/ui/PageHeader';
 import { SearchInput } from '../../components/admin/ui/SearchInput';
 import { Select } from '../../components/admin/ui/Field';
@@ -35,6 +36,7 @@ const SORT_VALUES = SORTS.map((s) => s.value);
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  useDocumentTitle('Products');
 
   const urlQ = searchParams.get('q') ?? '';
   const category = searchParams.get('category') ?? '';
@@ -183,7 +185,7 @@ export function ProductsPage() {
               </option>
             ))}
           </Select>
-          <label className="flex items-center gap-2 rounded-2xl bg-white/60 px-3.5 py-2.5 text-sm ring-1 ring-white/70">
+          <label className="flex items-center gap-2 rounded-2xl bg-white/60 px-3.5 py-2.5 text-sm ring-1 ring-white/70 focus-within:ring-2 focus-within:ring-brand-400">
             <SlidersHorizontal size={15} className="text-ink-soft" />
             <select
               value={sort}
@@ -210,6 +212,7 @@ export function ProductsPage() {
         emptyMessage="No products match your filters."
         skeletonRows={PAGE_SIZE}
         onRowClick={(p) => navigate(`/admin/products/${p.id}`)}
+        rowLabel={(p) => `Edit ${p.name}`}
       />
 
       <Pagination

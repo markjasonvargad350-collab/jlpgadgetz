@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, Search, ShoppingCart, Sparkles, X } from 'lucide-react';
@@ -16,6 +16,7 @@ export function StoreNav() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -23,6 +24,19 @@ export function StoreNav() {
     navigate(q ? `/shop?q=${encodeURIComponent(q)}` : '/shop');
     setMenuOpen(false);
   }
+
+  // Escape closes the mobile sheet and returns focus to the toggle button.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
     <header className="sticky top-0 z-30 mx-auto mt-4 w-[min(100%-1.5rem,76rem)]">
@@ -55,7 +69,7 @@ export function StoreNav() {
 
         {/* search (desktop) */}
         <form onSubmit={submitSearch} className="ml-auto hidden max-w-xs flex-1 items-center sm:flex">
-          <div className="flex w-full items-center gap-2 rounded-full bg-white/60 px-3 py-1.5">
+          <div className="flex w-full items-center gap-2 rounded-full bg-white/60 px-3 py-1.5 focus-within:ring-2 focus-within:ring-brand-400">
             <Search size={16} className="text-ink-soft" />
             <input
               value={query}
@@ -92,6 +106,7 @@ export function StoreNav() {
 
         {/* mobile menu toggle */}
         <button
+          ref={menuButtonRef}
           onClick={() => setMenuOpen((v) => !v)}
           className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white/60 md:hidden"
           aria-label="Toggle menu"
@@ -110,7 +125,7 @@ export function StoreNav() {
             exit={{ opacity: 0, y: -8 }}
             className="glass mt-2 flex flex-col gap-1 rounded-3xl p-3 md:hidden"
           >
-            <form onSubmit={submitSearch} className="mb-1 flex items-center gap-2 rounded-2xl bg-white/60 px-3 py-2">
+            <form onSubmit={submitSearch} className="mb-1 flex items-center gap-2 rounded-2xl bg-white/60 px-3 py-2 focus-within:ring-2 focus-within:ring-brand-400">
               <Search size={16} className="text-ink-soft" />
               <input
                 value={query}

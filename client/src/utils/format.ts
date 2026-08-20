@@ -41,6 +41,14 @@ const dateShortFmt = new Intl.DateTimeFormat('en-PH', {
   month: 'short',
   day: 'numeric',
 });
+// en-CA yields ISO-ordered yyyy-MM-dd — exactly what <input type="date"> wants —
+// evaluated in Manila time so it agrees with formatDate on the round-trip.
+const dateInputFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Manila',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
 
 /** e.g. "20 Aug 2026". */
 export function formatDate(input: DateInput): string {
@@ -55,4 +63,9 @@ export function formatDateTime(input: DateInput): string {
 /** Compact axis/tick label, e.g. "20 Aug". */
 export function formatDateShort(input: DateInput): string {
   return dateShortFmt.format(new Date(input));
+}
+
+/** Manila-local `yyyy-MM-dd` for a `<input type="date">` value. */
+export function toDateInputValue(input: DateInput): string {
+  return dateInputFmt.format(new Date(input));
 }

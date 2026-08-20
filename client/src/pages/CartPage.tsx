@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowRight, Minus, Plus, ShoppingBag, Smartphone, Trash2 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
@@ -9,6 +10,7 @@ const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
 export function CartPage() {
   const { items, subtotal, count, setQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+  useDocumentTitle('Your cart');
 
   if (items.length === 0) {
     return (
@@ -51,7 +53,7 @@ export function CartPage() {
                   className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/50"
                 >
                   {item.image ? (
-                    <img src={item.image} alt={item.productName} className="h-full w-full object-cover" />
+                    <img src={item.image} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={32} className="text-brand-300" />
                   )}

@@ -20,21 +20,71 @@ export interface ProductQuery {
 }
 
 // ── Prisma query shapes (typed via GetPayload so mapping is fully checked) ──
+//
+// These use `select` (not `include`) to fetch only the columns the mappers
+// below actually read — no over-fetching whole Category/Variant rows. The card
+// shape is deliberately leaner than the detail shape; `VariantRow` is derived
+// from the card shape, so it stays a structural subset of the detail variant
+// (the shared price/colour/storage helpers accept either).
 
-const cardInclude = {
-  category: true,
-  images: { orderBy: { position: 'asc' }, take: 1 },
-  variants: { where: { isActive: true }, orderBy: { price: 'asc' } },
-} satisfies Prisma.ProductInclude;
+const cardSelect = {
+  id: true,
+  slug: true,
+  name: true,
+  brand: true,
+  model: true,
+  basePrice: true,
+  releaseYear: true,
+  discountPct: true,
+  isFeatured: true,
+  isNewArrival: true,
+  isBestSeller: true,
+  isDeal: true,
+  category: { select: { slug: true, name: true } },
+  images: { select: { url: true, alt: true }, orderBy: { position: 'asc' }, take: 1 },
+  variants: {
+    where: { isActive: true },
+    orderBy: { price: 'asc' },
+    select: { storage: true, color: true, colorHex: true, price: true, stock: true },
+  },
+} satisfies Prisma.ProductSelect;
 
-const detailInclude = {
-  category: true,
-  images: { orderBy: { position: 'asc' } },
-  variants: { where: { isActive: true }, orderBy: [{ price: 'asc' }, { storage: 'asc' }] },
-} satisfies Prisma.ProductInclude;
+const detailSelect = {
+  id: true,
+  slug: true,
+  name: true,
+  brand: true,
+  model: true,
+  description: true,
+  highlights: true,
+  basePrice: true,
+  releaseYear: true,
+  discountPct: true,
+  isFeatured: true,
+  isNewArrival: true,
+  isBestSeller: true,
+  isDeal: true,
+  category: { select: { slug: true, name: true } },
+  images: { select: { id: true, url: true, alt: true, position: true }, orderBy: { position: 'asc' } },
+  variants: {
+    where: { isActive: true },
+    orderBy: [{ price: 'asc' }, { storage: 'asc' }],
+    select: {
+      id: true,
+      sku: true,
+      storage: true,
+      color: true,
+      colorHex: true,
+      price: true,
+      imageUrl: true,
+      stock: true,
+      lowStockThreshold: true,
+    },
+  },
+} satisfies Prisma.ProductSelect;
 
-type ProductCardRow = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
-type ProductDetailRow = Prisma.ProductGetPayload<{ include: typeof detailInclude }>;
+type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof cardSelect }>;
+type ProductDetailRow = Prisma.ProductGetPayload<{ select: typeof detailSelect }>;
 
 type VariantRow = ProductCardRow['variants'][number];
 
@@ -208,7 +258,7 @@ export async function listProducts(query: ProductQuery) {
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
-      include: cardInclude,
+      select: cardSelect,
       orderBy: buildOrderBy(query.sort),
       skip,
       take: query.pageSize,
@@ -227,7 +277,7 @@ export async function listProducts(query: ProductQuery) {
 export async function getProduct(idOrSlug: string) {
   const product = await prisma.product.findFirst({
     where: { status: ProductStatus.ACTIVE, OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    include: detailInclude,
+    select: detailSelect,
   });
   if (!product) {
     throw ApiError.notFound('Product not found');

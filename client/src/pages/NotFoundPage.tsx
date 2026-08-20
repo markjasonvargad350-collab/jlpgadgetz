@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { Home } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
 
 export function NotFoundPage() {
+  useDocumentTitle('Page not found');
   return (
     <div className={`${WIDTH} py-24 text-center`}>
       <div className="glass mx-auto max-w-md rounded-3xl p-10">

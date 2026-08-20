@@ -1,19 +1,24 @@
 import express, { type Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
-import { env } from './config/env';
+import { CLIENT_ORIGINS, isProd } from './config/env';
 import { prisma } from './config/prisma';
 import { asyncHandler } from './utils/asyncHandler';
 import { notFound } from './middleware/notFound';
 import { errorHandler } from './middleware/errorHandler';
+import { csrfGuard } from './middleware/csrf';
+import { requestLog } from './middleware/requestLog';
+import { publicCache, noStore } from './middleware/cacheControl';
 import authRouter from './routes/auth.routes';
 import productRouter from './routes/product.routes';
 import categoryRouter from './routes/category.routes';
 import adminProductRouter from './routes/admin.product.routes';
 import adminInventoryRouter from './routes/admin.inventory.routes';
 import adminOrderRouter from './routes/admin.order.routes';
+import adminShipmentRouter from './routes/admin.shipment.routes';
 import adminReportRouter from './routes/admin.report.routes';
 import orderRouter from './routes/order.routes';
 
@@ -27,16 +32,41 @@ export function createApp(): Application {
   // Security & platform middleware
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // correct client IPs behind a proxy (Render/Railway/Vercel)
-  app.use(helmet());
+
+  // Assign/echo a request id and log one line per request. Registered first so
+  // every response — including health checks and rate-limited ones — is covered.
+  app.use(requestLog);
+
+  // Security headers. CSP is left at Helmet's defaults — this is a JSON API, not
+  // an HTML origin, so a page CSP adds little. HSTS only means anything over
+  // HTTPS, so it's enabled in production only.
+  app.use(
+    helmet({
+      hsts: isProd ? { maxAge: 15552000, includeSubDomains: true } : false,
+      referrerPolicy: { policy: 'no-referrer' },
+      crossOriginResourcePolicy: { policy: 'same-site' },
+    }),
+  );
+
+  // CORS: reflect only allow-listed origins (never a wildcard — we send
+  // credentials). Requests with no Origin (curl, same-origin, health probes) are
+  // allowed; a disallowed browser origin simply gets no CORS headers back and is
+  // blocked by the browser.
   app.use(
     cors({
-      origin: env.CLIENT_URL,
+      origin(origin, cb) {
+        if (!origin || CLIENT_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(null, false);
+      },
       credentials: true, // allow the admin auth cookie
     }),
   );
   app.use(express.json({ limit: '1mb' }));
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
   app.use(cookieParser());
+
+  // Gzip/deflate responses (JSON payloads compress well) before they hit routers.
+  app.use(compression());
 
   // Baseline rate limit for the whole API (auth routes get a stricter one later)
   app.use(
@@ -53,6 +83,7 @@ export function createApp(): Application {
   app.get(
     '/api/health',
     asyncHandler(async (_req, res) => {
+      res.setHeader('Cache-Control', 'no-store'); // liveness must never be cached
       let db: 'up' | 'down' = 'down';
       try {
         await prisma.$queryRaw`SELECT 1`;
@@ -63,12 +94,20 @@ export function createApp(): Application {
       res.status(db === 'up' ? 200 : 503).json({
         status: db === 'up' ? 'ok' : 'degraded',
         service: 'iphone-ecommerce-api',
-        env: env.NODE_ENV,
         db,
         time: new Date().toISOString(),
       });
     }),
   );
+
+  // CSRF: reject cross-origin state-changing requests before they reach any
+  // router (safe methods and origin-matching requests pass through).
+  app.use('/api', csrfGuard);
+
+  // Cache policy: everything authed or PII-bearing is never stored; public
+  // catalog reads are briefly cacheable (the error handler downgrades any
+  // failed response back to no-store, so 404s/500s are never cached).
+  app.use(['/api/admin', '/api/orders'], noStore);
 
   // ── Feature routers ──
   // Auth is mounted first so /api/admin/auth/* resolves before the catch-all
@@ -77,10 +116,11 @@ export function createApp(): Application {
   app.use('/api/admin/auth', authRouter);
   app.use('/api/admin/inventory', adminInventoryRouter);
   app.use('/api/admin/orders', adminOrderRouter);
+  app.use('/api/admin/shipments', adminShipmentRouter);
   app.use('/api/admin/reports', adminReportRouter);
   app.use('/api/admin', adminProductRouter);
-  app.use('/api/products', productRouter);
-  app.use('/api/categories', categoryRouter);
+  app.use('/api/products', publicCache(), productRouter);
+  app.use('/api/categories', publicCache(), categoryRouter);
   app.use('/api/orders', orderRouter);
 
   // 404 + centralized error handling (must be last)

@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement, useId } from 'react';
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 /** Labeled form control wrapper with optional hint + error message. */
@@ -14,12 +15,36 @@ export function Field({
   hint?: string;
   children: ReactNode;
 }) {
+  const uid = useId();
+  const hintId = `${uid}-hint`;
+  const errorId = `${uid}-error`;
+  const describedById = error ? errorId : hint ? hintId : undefined;
+
+  // Link the control to its error/hint text for screen readers, and mark it
+  // invalid when an error is present. Non-element children are left untouched.
+  const control =
+    isValidElement(children) && describedById
+      ? cloneElement(children as any, {
+          'aria-describedby':
+            [(children as any).props['aria-describedby'], describedById].filter(Boolean).join(' '),
+          'aria-invalid': error ? true : (children as any).props['aria-invalid'],
+        })
+      : children;
+
   return (
     <label htmlFor={htmlFor} className="block">
       <span className="mb-1.5 block text-sm font-semibold text-ink">{label}</span>
-      {children}
-      {hint && !error && <span className="mt-1 block text-xs text-ink-soft">{hint}</span>}
-      {error && <span className="mt-1 block text-xs font-medium text-coral">{error}</span>}
+      {control}
+      {hint && !error && (
+        <span id={hintId} className="mt-1 block text-xs text-ink-soft">
+          {hint}
+        </span>
+      )}
+      {error && (
+        <span id={errorId} role="alert" className="mt-1 block text-xs font-medium text-coral">
+          {error}
+        </span>
+      )}
     </label>
   );
 }

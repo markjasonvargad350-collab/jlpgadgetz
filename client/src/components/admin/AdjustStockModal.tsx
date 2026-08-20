@@ -204,7 +204,7 @@ export function AdjustStockModal({
         )}
 
         {error && (
-          <div className="rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{error}</div>
+          <div role="alert" className="rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{error}</div>
         )}
 
         <div className="mt-2 flex items-center justify-end gap-2">

@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { StoreLayout } from './layouts/StoreLayout';
 import { HomePage } from './pages/HomePage';
@@ -10,15 +11,22 @@ import { TrackOrderPage } from './pages/TrackOrderPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { RequireAuth } from './routes/RequireAuth';
-import { AdminLayout } from './layouts/AdminLayout';
-import { LoginPage } from './pages/admin/LoginPage';
-import { DashboardPage } from './pages/admin/DashboardPage';
-import { ProductsPage } from './pages/admin/ProductsPage';
-import { ProductEditPage } from './pages/admin/ProductEditPage';
-import { InventoryPage } from './pages/admin/InventoryPage';
-import { OrdersPage } from './pages/admin/OrdersPage';
-import { OrderDetailPage } from './pages/admin/OrderDetailPage';
-import { ReportsPage } from './pages/admin/ReportsPage';
+import { PageLoader } from './components/admin/ui/Spinner';
+
+// The entire admin back-office is code-split behind React.lazy: it sits behind
+// session auth and is never reached by storefront visitors, so deferring it
+// keeps the initial customer bundle lean — Recharts (the ~360 kB charts chunk),
+// Leaflet, and the admin shell all leave the entry and load only once someone
+// navigates to /admin. Named exports are mapped to `default` for lazy().
+const AdminLayout = lazy(() => import('./layouts/AdminLayout').then((m) => ({ default: m.AdminLayout })));
+const LoginPage = lazy(() => import('./pages/admin/LoginPage').then((m) => ({ default: m.LoginPage })));
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage').then((m) => ({ default: m.DashboardPage })));
+const ProductsPage = lazy(() => import('./pages/admin/ProductsPage').then((m) => ({ default: m.ProductsPage })));
+const ProductEditPage = lazy(() => import('./pages/admin/ProductEditPage').then((m) => ({ default: m.ProductEditPage })));
+const InventoryPage = lazy(() => import('./pages/admin/InventoryPage').then((m) => ({ default: m.InventoryPage })));
+const OrdersPage = lazy(() => import('./pages/admin/OrdersPage').then((m) => ({ default: m.OrdersPage })));
+const OrderDetailPage = lazy(() => import('./pages/admin/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })));
+const ReportsPage = lazy(() => import('./pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 
 /**
  * Route map. Public pages render inside StoreLayout; the admin subtree lives
@@ -39,7 +47,15 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
-      <Route element={<AdminAuthProvider><Outlet /></AdminAuthProvider>}>
+      <Route
+        element={
+          <AdminAuthProvider>
+            <Suspense fallback={<PageLoader label="Loading admin…" />}>
+              <Outlet />
+            </Suspense>
+          </AdminAuthProvider>
+        }
+      >
         <Route path="/admin/login" element={<LoginPage />} />
         <Route element={<RequireAuth />}>
           <Route path="/admin" element={<AdminLayout />}>

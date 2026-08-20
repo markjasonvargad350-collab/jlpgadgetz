@@ -12,6 +12,8 @@ import { money } from '../utils/money';
 import { computeDeliveryFee } from '../config/order';
 import { recordInventoryChange } from './inventory.service';
 import { paymentProvider, paymentInstructions } from './payment.service';
+import { deliveryProvider } from './delivery.service';
+import { routeFor, type GeoPoint } from '../config/delivery';
 import { logAudit } from './audit.service';
 import { manilaDateStamp } from '../utils/time';
 
@@ -72,6 +74,34 @@ export const orderInclude = {
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
+/** A {lat,lng} pair, or null when either coordinate is missing (nullable Float columns). */
+function toPoint(lat: number | null, lng: number | null): GeoPoint | null {
+  return lat !== null && lng !== null ? { lat, lng } : null;
+}
+
+/** Shape a shipment (with its history) into the client DTO, surfacing simulated geo. */
+function toShipmentDTO(s: NonNullable<OrderRow['shipment']>): NonNullable<OrderDTO['shipment']> {
+  const destination = toPoint(s.destLat, s.destLng);
+  return {
+    status: s.status,
+    courier: s.courier,
+    trackingCode: s.trackingCode,
+    estimatedArrival: s.estimatedArrival?.toISOString() ?? null,
+    deliveredAt: s.deliveredAt?.toISOString() ?? null,
+    origin: toPoint(s.originLat, s.originLng),
+    destination,
+    current: toPoint(s.currentLat, s.currentLng),
+    route: destination ? routeFor(destination) : [],
+    history: s.history.map((h) => ({
+      status: h.status,
+      note: h.note,
+      lat: h.lat,
+      lng: h.lng,
+      createdAt: h.createdAt.toISOString(),
+    })),
+  };
+}
+
 export interface OrderDTO {
   orderNumber: string;
   status: OrderStatus;
@@ -103,14 +133,20 @@ export interface OrderDTO {
   total: number;
   payment: { reference: string | null; instructions: string };
   updatedAt: string;
-  /** Fulfillment + tracking timeline. Present once a shipment exists; null otherwise. */
+  /** Fulfillment + tracking timeline (+ simulated geo). Present once a shipment exists; null otherwise. */
   shipment: {
     status: ShipmentStatus;
     courier: string | null;
     trackingCode: string | null;
     estimatedArrival: string | null;
     deliveredAt: string | null;
-    history: { status: OrderStatus; note: string | null; createdAt: string }[];
+    /** Simulated coordinates — NOT real GPS. Null when a shipment has no geo. */
+    origin: GeoPoint | null;
+    destination: GeoPoint | null;
+    current: GeoPoint | null;
+    /** The full simulated route toward the destination ([] when no destination). */
+    route: { status: OrderStatus; note: string; lat: number; lng: number }[];
+    history: { status: OrderStatus; note: string | null; lat: number | null; lng: number | null; createdAt: string }[];
   } | null;
 }
 
@@ -150,20 +186,7 @@ export function toOrderDTO(o: OrderRow): OrderDTO {
       instructions: paymentInstructions(o.paymentMethod, o.total.toNumber()),
     },
     updatedAt: o.updatedAt.toISOString(),
-    shipment: o.shipment
-      ? {
-          status: o.shipment.status,
-          courier: o.shipment.courier,
-          trackingCode: o.shipment.trackingCode,
-          estimatedArrival: o.shipment.estimatedArrival?.toISOString() ?? null,
-          deliveredAt: o.shipment.deliveredAt?.toISOString() ?? null,
-          history: o.shipment.history.map((h) => ({
-            status: h.status,
-            note: h.note,
-            createdAt: h.createdAt.toISOString(),
-          })),
-        }
-      : null,
+    shipment: o.shipment ? toShipmentDTO(o.shipment) : null,
   };
 }
 
@@ -293,6 +316,12 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
                   amount: total,
                   reference: pay.reference,
                 },
+              },
+              // Attach a simulated shipment (origin=warehouse, dest derived from
+              // the delivery city) so every order is trackable from the moment
+              // it's placed. SIMULATED — see delivery.service.ts.
+              shipment: {
+                create: deliveryProvider.newShipmentForOrder(input.address.city, orderNumber, now),
               },
             },
             select: { id: true },

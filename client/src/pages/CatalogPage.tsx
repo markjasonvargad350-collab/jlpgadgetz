@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from 'lucide-
 import { useProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useDebounce } from '../hooks/useDebounce';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { ProductGrid } from '../components/store/ProductGrid';
 import type { ProductListParams, ProductSort } from '../types/api';
 
@@ -58,7 +59,7 @@ export function CatalogPage() {
   useEffect(() => setMinInput(minPrice), [minPrice]);
   useEffect(() => setMaxInput(maxPrice), [maxPrice]);
 
-  const { data: categories } = useCategories();
+  const { data: categories, error: categoriesError, reload: reloadCategories } = useCategories();
 
   const params: ProductListParams = {
     q: urlQ || undefined,
@@ -114,6 +115,8 @@ export function CatalogPage() {
               ? 'Featured'
               : 'All products';
 
+  useDocumentTitle(title);
+
   const totalPages = data?.totalPages ?? 1;
 
   return (
@@ -128,7 +131,7 @@ export function CatalogPage() {
 
       {/* search + sort row */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-1 items-center gap-2 rounded-full glass px-4 py-2.5">
+        <div className="flex flex-1 items-center gap-2 rounded-full glass px-4 py-2.5 focus-within:ring-2 focus-within:ring-brand-400">
           <Search size={18} className="text-ink-soft" />
           <input
             value={term}
@@ -143,7 +146,7 @@ export function CatalogPage() {
             </button>
           )}
         </div>
-        <label className="flex items-center gap-2 rounded-full glass px-4 py-2.5 text-sm font-medium">
+        <label className="flex items-center gap-2 rounded-full glass px-4 py-2.5 text-sm font-medium focus-within:ring-2 focus-within:ring-brand-400">
           <SlidersHorizontal size={16} className="text-ink-soft" />
           <span className="text-ink-soft">Sort</span>
           <select
@@ -162,7 +165,7 @@ export function CatalogPage() {
       </div>
 
       {/* category chips */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <Chip active={!category} onClick={() => updateParams({ category: null, page: null })}>
           All
         </Chip>
@@ -175,6 +178,14 @@ export function CatalogPage() {
             {c.name}
           </Chip>
         ))}
+        {categoriesError && (
+          <span className="flex items-center gap-2 text-sm text-ink-soft" role="alert">
+            {categoriesError}
+            <button onClick={reloadCategories} className="font-semibold text-brand-700 hover:underline">
+              Retry
+            </button>
+          </span>
+        )}
       </div>
 
       {/* secondary filters */}
@@ -189,7 +200,7 @@ export function CatalogPage() {
           In stock only
         </label>
 
-        <div className="flex items-center gap-2 rounded-full glass px-3 py-1.5 text-sm">
+        <div className="flex items-center gap-2 rounded-full glass px-3 py-1.5 text-sm focus-within:ring-2 focus-within:ring-brand-400">
           <span className="text-ink-soft">₱</span>
           <input
             type="number"

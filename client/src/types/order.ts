@@ -68,12 +68,30 @@ export interface OrderItemDTO {
 export interface TrackingEntry {
   status: OrderStatus;
   note: string | null;
+  /** Simulated coordinates — NOT real GPS. Null on entries without geo. */
+  lat: number | null;
+  lng: number | null;
   createdAt: string;
 }
 
+/** A simulated map coordinate (NOT real GPS). */
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
+/** One milestone on the simulated delivery route. */
+export interface RouteWaypoint {
+  status: OrderStatus;
+  note: string;
+  lat: number;
+  lng: number;
+}
+
 /**
- * Shipment snapshot attached to an order. `status` follows ShipmentStatus, which
- * is driven live in Phase 9; for now history mirrors the order's fulfillment.
+ * Shipment snapshot attached to an order. `status` follows ShipmentStatus,
+ * driven live by the fulfillment state-machine. Coordinates are SIMULATED —
+ * a fixed reference route through Metro Manila, not real GPS.
  */
 export interface ShipmentDTO {
   status: ShipmentStatus;
@@ -81,6 +99,10 @@ export interface ShipmentDTO {
   trackingCode: string | null;
   estimatedArrival: string | null;
   deliveredAt: string | null;
+  origin: GeoPoint | null;
+  destination: GeoPoint | null;
+  current: GeoPoint | null;
+  route: RouteWaypoint[];
   history: TrackingEntry[];
 }
 

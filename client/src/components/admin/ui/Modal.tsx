@@ -1,10 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
-
-const EASE = [0.22, 1, 0.36, 1] as const; // matches --ease-spring
+import { useFocusTrap } from '../../../hooks/useFocusTrap';
+import { SPRING_EASE } from '../../../utils/motion';
 
 const SIZES = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' } as const;
 
@@ -28,6 +28,9 @@ export function Modal({
   footer?: ReactNode;
   size?: keyof typeof SIZES;
 }) {
+  const titleId = useId();
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   // Escape to close + body scroll lock while open.
   useEffect(() => {
     if (!open) return;
@@ -56,16 +59,18 @@ export function Modal({
             aria-hidden
           />
           <motion.div
+            ref={trapRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={titleId}
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ duration: 0.22, ease: EASE }}
+            transition={{ duration: 0.22, ease: SPRING_EASE }}
             className={`glass relative w-full ${SIZES[size]} max-h-[85vh] overflow-y-auto rounded-3xl p-6`}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
-              <h3 className="font-display text-lg font-bold">{title}</h3>
+              <h3 id={titleId} className="font-display text-lg font-bold">{title}</h3>
               <button
                 onClick={onClose}
                 aria-label="Close"

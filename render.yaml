@@ -1,0 +1,57 @@
+# ============================================================================
+#  Render Blueprint — Infrastructure-as-Code for the iStore API (Express).
+#  Spec: https://render.com/docs/blueprint-spec
+#
+#  Usage:
+#    1. Push this repo to GitHub.
+#    2. Render dashboard → New → Blueprint → pick this repo.
+#    3. Render reads this file, provisions the service, and prompts for the
+#       env vars marked `sync: false` (fill them from your Neon DB + Vercel URL).
+#
+#  Database: NOT provisioned here — we use Neon (managed Postgres). Paste the
+#  Neon connection string into DATABASE_URL when prompted (see docs/DEPLOYMENT.md).
+# ============================================================================
+
+services:
+  - type: web
+    name: istore-api
+    runtime: node
+    region: singapore # closest Render region to the Philippines (match Neon's region)
+    plan: free # free web services sleep after ~15 min idle → cold starts. Use `starter` for always-on.
+    rootDir: server # the Express app lives in /server; all commands run from there
+    # Build: install ALL deps (incl. dev — prisma/tsc/tsx are devDeps and NODE_ENV=production
+    # would otherwise omit them) → generate the Prisma client (needed before tsc) → compile to dist/.
+    buildCommand: npm install --include=dev && npm run prisma:generate && npm run build
+    # Start: apply any pending migrations (idempotent), then run the compiled server.
+    # On a PAID plan, move `npm run prisma:deploy` to `preDeployCommand` so it runs
+    # once per deploy instead of on every cold-start boot.
+    startCommand: npm run prisma:deploy && npm start
+    healthCheckPath: /api/health # returns 200 when the DB is reachable, 503 otherwise
+    autoDeployTrigger: commit # redeploy on every push to the connected branch
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true # Render generates a strong random secret (≥32 chars) once
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Set after the frontend is live. Comma-separated, no trailing slash, https only.
+      # Drives BOTH the CORS allowlist and the CSRF Origin check. localhost is rejected in prod.
+      - key: CLIENT_URL
+        sync: false
+      # Neon Postgres — use the DIRECT (non-pooled) connection string, keep ?sslmode=require.
+      - key: DATABASE_URL
+        sync: false
+      # Seed/bootstrap credentials. MUST be non-default in production — the app
+      # refuses to boot if ADMIN_PASSWORD/STAFF_PASSWORD are the dev defaults.
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: STAFF_EMAIL
+        sync: false
+      - key: STAFF_PASSWORD
+        sync: false
+      # Optional: log verbosity (debug|info|warn|error). Defaults to `info` in production.
+      # - key: LOG_LEVEL
+      #   value: info

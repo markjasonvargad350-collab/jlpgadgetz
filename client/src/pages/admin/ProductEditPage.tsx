@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Trash2 } from 'lucide-react';
 import { useAdminProduct } from '../../hooks/useAdminProduct';
 import { useCategories } from '../../hooks/useCategories';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { createProduct, updateProduct, deleteProduct } from '../../services/adminProducts';
 import { ApiError } from '../../services/http';
@@ -104,6 +105,7 @@ function NewProductForm() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  useDocumentTitle('New product');
 
   async function handleCreate() {
     const found = validate(form);
@@ -141,7 +143,7 @@ function NewProductForm() {
 
       <div className="glass rounded-3xl p-6">
         <ProductFields value={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} categories={categories} errors={errors} />
-        {apiError && <div className="mt-4 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{apiError}</div>}
+        {apiError && <div role="alert" className="mt-4 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{apiError}</div>}
       </div>
 
       <p className="mt-4 rounded-2xl bg-white/40 px-4 py-3 text-sm text-ink-soft ring-1 ring-white/60">
@@ -168,6 +170,7 @@ function ProductEditor({ product, onChanged }: { product: AdminProductDetail; on
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  useDocumentTitle(product.name);
 
   async function handleSave() {
     const found = validate(form);
@@ -238,7 +241,7 @@ function ProductEditor({ product, onChanged }: { product: AdminProductDetail; on
             categories={categories}
             errors={errors}
           />
-          {saveError && <div className="mt-4 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{saveError}</div>}
+          {saveError && <div role="alert" className="mt-4 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">{saveError}</div>}
         </div>
 
         <ImagesPanel productId={product.id} images={product.images} onChanged={onChanged} />
@@ -250,7 +253,7 @@ function ProductEditor({ product, onChanged }: { product: AdminProductDetail; on
             <p className="mt-1 text-sm text-ink-soft">
               Permanently delete this product. This is blocked once it has sales or stock history — archive it instead.
             </p>
-            {deleteError && <p className="mt-3 text-sm font-medium text-coral">{deleteError}</p>}
+            {deleteError && <p role="alert" className="mt-3 text-sm font-medium text-coral">{deleteError}</p>}
             <button
               onClick={() => setConfirmOpen(true)}
               className="mt-4 flex items-center gap-2 rounded-full bg-coral px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-coral/25 transition-transform hover:scale-[1.02] active:scale-95"

@@ -8,6 +8,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useReportsSummary } from '../../hooks/useReportsSummary';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { PageHeader } from '../../components/admin/ui/PageHeader';
 import { PageLoader } from '../../components/admin/ui/Spinner';
 import { StatTile } from '../../components/admin/ui/StatTile';
@@ -24,6 +25,7 @@ const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
 
 export function ReportsPage() {
   const { data, loading, error } = useReportsSummary();
+  useDocumentTitle('Reports');
 
   if (loading && !data) return <PageLoader label="Loading reports…" />;
   if (error || !data) {

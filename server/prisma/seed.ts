@@ -25,6 +25,7 @@ import {
 } from '@prisma/client';
 import { prisma, disconnectPrisma } from '../src/config/prisma';
 import { env, isProd } from '../src/config/env';
+import { WAREHOUSE, deriveDestination, routeFor } from '../src/config/delivery';
 
 // --- helpers ----------------------------------------------------------------
 
@@ -42,11 +43,6 @@ const daysAgo = (n: number) => {
   d.setDate(d.getDate() - n);
   return d;
 };
-
-// Metro Manila coordinates for the simulated delivery map.
-const WAREHOUSE = { lat: 14.5995, lng: 120.9842, label: 'iStore Warehouse — Manila' };
-const HUB = { lat: 14.6349, lng: 121.0177, label: 'Distribution Hub — San Juan' };
-const DESTINATION = { lat: 14.676, lng: 121.0437, label: 'Quezon City' };
 
 // --- color palettes ---------------------------------------------------------
 
@@ -611,17 +607,6 @@ async function main() {
     },
   ];
 
-  // Ordered milestones with coordinates for the simulated tracking timeline/map.
-  const ROUTE: { status: OrderStatus; note: string; lat: number; lng: number }[] = [
-    { status: OrderStatus.RECEIVED, note: 'Order placed and confirmed', lat: WAREHOUSE.lat, lng: WAREHOUSE.lng },
-    { status: OrderStatus.PROCESSING, note: 'Preparing your order', lat: WAREHOUSE.lat, lng: WAREHOUSE.lng },
-    { status: OrderStatus.PACKED, note: 'Packed at the warehouse', lat: WAREHOUSE.lat, lng: WAREHOUSE.lng },
-    { status: OrderStatus.SHIPPED, note: 'Handed to iStore Express', lat: WAREHOUSE.lat, lng: WAREHOUSE.lng },
-    { status: OrderStatus.IN_TRANSIT, note: 'Arrived at distribution hub', lat: HUB.lat, lng: HUB.lng },
-    { status: OrderStatus.OUT_FOR_DELIVERY, note: 'Out for delivery', lat: DESTINATION.lat - 0.02, lng: DESTINATION.lng - 0.015 },
-    { status: OrderStatus.DELIVERED, note: 'Delivered — thank you!', lat: DESTINATION.lat, lng: DESTINATION.lng },
-  ];
-
   for (const so of sampleOrders) {
     await prisma.$transaction(async (tx) => {
       // Resolve lines against seeded variants, snapshotting details.
@@ -698,7 +683,10 @@ async function main() {
       }
 
       // Shipment + tracking history up to the order's current milestone.
-      const milestones = ROUTE.slice(0, ROUTE.findIndex((r) => r.status === so.trackingUpTo) + 1);
+      // Destination is derived from the order's city (shared config/delivery.ts).
+      const dest = deriveDestination(so.address.city);
+      const route = routeFor(dest);
+      const milestones = route.slice(0, route.findIndex((r) => r.status === so.trackingUpTo) + 1);
       const last = milestones[milestones.length - 1]!;
       await tx.shipment.create({
         data: {
@@ -708,8 +696,8 @@ async function main() {
           trackingCode: `IEX${yyyymmdd(so.placedAt)}${so.seq}`,
           originLat: WAREHOUSE.lat,
           originLng: WAREHOUSE.lng,
-          destLat: DESTINATION.lat,
-          destLng: DESTINATION.lng,
+          destLat: dest.lat,
+          destLng: dest.lng,
           currentLat: last.lat,
           currentLng: last.lng,
           estimatedArrival: so.orderStatus === OrderStatus.DELIVERED ? so.placedAt : daysAgo(-2),

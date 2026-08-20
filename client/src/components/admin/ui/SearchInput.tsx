@@ -19,7 +19,7 @@ export function SearchInput({
   'aria-label'?: string;
 }) {
   return (
-    <div className={`flex items-center gap-2 rounded-2xl bg-white/60 px-3.5 py-2.5 ring-1 ring-white/70 ${className}`}>
+    <div className={`flex items-center gap-2 rounded-2xl bg-white/60 px-3.5 py-2.5 ring-1 ring-white/70 focus-within:ring-2 focus-within:ring-brand-400 ${className}`}>
       <Search size={16} className="shrink-0 text-ink-soft" />
       <input
         value={value}

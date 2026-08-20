@@ -28,6 +28,7 @@ export function DataTable<T>({
   emptyMessage = 'Nothing to show.',
   skeletonRows = 8,
   onRowClick,
+  rowLabel,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -37,6 +38,8 @@ export function DataTable<T>({
   emptyMessage?: string;
   skeletonRows?: number;
   onRowClick?: (row: T) => void;
+  /** Accessible label for a clickable row (e.g. "Edit iPhone 15"); used when `onRowClick` is set. */
+  rowLabel?: (row: T) => string;
 }) {
   return (
     <div className="glass overflow-hidden rounded-3xl">
@@ -67,7 +70,7 @@ export function DataTable<T>({
               ))
             ) : error ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-14 text-center text-sm text-coral">
+                <td colSpan={columns.length} role="alert" className="px-4 py-14 text-center text-sm text-coral">
                   {error}
                 </td>
               </tr>
@@ -82,7 +85,24 @@ export function DataTable<T>({
                 <tr
                   key={keyOf(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={`transition-colors ${onRowClick ? 'cursor-pointer hover:bg-white/50' : ''}`}
+                  onKeyDown={
+                    onRowClick
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onRowClick(row);
+                          }
+                        }
+                      : undefined
+                  }
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? 'button' : undefined}
+                  aria-label={onRowClick ? rowLabel?.(row) : undefined}
+                  className={`transition-colors ${
+                    onRowClick
+                      ? 'cursor-pointer hover:bg-white/50 focus-visible:bg-white/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-inset'
+                      : ''
+                  }`}
                 >
                   {columns.map((c) => (
                     <td key={c.key} className={`px-4 py-3.5 align-middle ${ALIGN[c.align ?? 'left']} ${c.className ?? ''}`}>

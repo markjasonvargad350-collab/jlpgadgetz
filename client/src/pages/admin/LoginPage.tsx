@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { ApiError } from '../../services/http';
+import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Field, Input } from '../../components/admin/ui/Field';
 import { PageLoader, Spinner } from '../../components/admin/ui/Spinner';
 
@@ -18,6 +19,8 @@ export function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useDocumentTitle('Sign in');
 
   // Wait for the session probe, then bounce authed admins straight through.
   if (loading) return <PageLoader label="Checking your session…" />;
@@ -38,7 +41,7 @@ export function LoginPage() {
 
   return (
     <div className="bg-aurora grid min-h-screen place-items-center px-4 py-10">
-      <div className="w-full max-w-md">
+      <main className="w-full max-w-md">
         <div className="glass rounded-3xl p-8 sm:p-10">
           <div className="flex flex-col items-center text-center">
             <span className="grid h-14 w-14 place-items-center rounded-2xl brand-gradient text-white shadow-lg shadow-brand-600/25">
@@ -49,7 +52,7 @@ export function LoginPage() {
           </div>
 
           {error && (
-            <div className="mt-6 flex items-start gap-2 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">
+            <div role="alert" className="mt-6 flex items-start gap-2 rounded-2xl bg-coral/10 px-4 py-3 text-sm text-coral ring-1 ring-coral/20">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -113,7 +116,7 @@ export function LoginPage() {
         >
           <ArrowLeft size={15} /> Back to store
         </Link>
-      </div>
+      </main>
     </div>
   );
 }

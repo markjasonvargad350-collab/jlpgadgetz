@@ -1,10 +1,11 @@
-import { Prisma, OrderStatus, PaymentStatus, PaymentMethod, InventoryTxnType } from '@prisma/client';
+import { Prisma, OrderStatus, PaymentStatus, PaymentMethod, InventoryTxnType, ShipmentStatus } from '@prisma/client';
 import { prisma } from '../config/prisma';
 import { ApiError } from '../utils/ApiError';
 import { recordInventoryChange } from './inventory.service';
 import { logAudit } from './audit.service';
 import { loadOrderDTOByNumber, type OrderDTO } from './order.service';
 import { manilaRangeToUtc } from '../utils/time';
+import { WAREHOUSE, noteForStatus, waypointForStatus, orderToShipmentStatus } from '../config/delivery';
 import type { AdminOrderListQuery } from '../validators/admin.order.validator';
 
 // ── Order list (card DTO) ────────────────────────────────────────────────────
@@ -112,28 +113,6 @@ export function nextForwardStatus(status: OrderStatus): OrderStatus | null {
   return ALLOWED_TRANSITIONS[status].find((s) => s !== OrderStatus.CANCELLED) ?? null;
 }
 
-/** Human-friendly tracking-history note for a fulfillment milestone. */
-function milestoneNote(status: OrderStatus): string {
-  switch (status) {
-    case OrderStatus.PROCESSING:
-      return 'Order is being prepared.';
-    case OrderStatus.PACKED:
-      return 'Packed and awaiting courier.';
-    case OrderStatus.SHIPPED:
-      return 'Handed to the courier.';
-    case OrderStatus.IN_TRANSIT:
-      return 'In transit between hubs.';
-    case OrderStatus.OUT_FOR_DELIVERY:
-      return 'Out for delivery.';
-    case OrderStatus.DELIVERED:
-      return 'Delivered to the customer.';
-    case OrderStatus.CANCELLED:
-      return 'Order cancelled — inventory restocked.';
-    default:
-      return '';
-  }
-}
-
 /**
  * Advance (or cancel) an order's fulfillment status. The correctness-critical
  * path — everything runs in ONE transaction:
@@ -169,7 +148,7 @@ export async function updateOrderStatus(
           paymentStatus: true,
           paymentMethod: true,
           items: { select: { variantId: true, quantity: true } },
-          shipment: { select: { id: true } },
+          shipment: { select: { id: true, destLat: true, destLng: true } },
         },
       });
       if (!order) {
@@ -223,15 +202,35 @@ export async function updateOrderStatus(
         }
         if (order.shipment) {
           await tx.trackingHistory.create({
-            data: { shipmentId: order.shipment.id, status: OrderStatus.CANCELLED, note: milestoneNote(OrderStatus.CANCELLED) },
+            data: { shipmentId: order.shipment.id, status: OrderStatus.CANCELLED, note: noteForStatus(OrderStatus.CANCELLED) },
+          });
+          // Fail the shipment, but DON'T move `current` — it stays where it was.
+          await tx.shipment.update({
+            where: { id: order.shipment.id },
+            data: { status: ShipmentStatus.FAILED },
           });
         }
       } else {
-        // Forward step. Phase 9 owns the live shipment/geo simulation; here we
-        // only append a fulfillment milestone to the tracking history.
+        // Forward step. Advance the simulated shipment along its route: record a
+        // tracking milestone (with the waypoint's coordinates) and move the
+        // shipment's live position + lifecycle status. SIMULATED — not real GPS.
         if (order.shipment) {
+          const dest = {
+            lat: order.shipment.destLat ?? WAREHOUSE.lat,
+            lng: order.shipment.destLng ?? WAREHOUSE.lng,
+          };
+          const wp = waypointForStatus(next, dest);
           await tx.trackingHistory.create({
-            data: { shipmentId: order.shipment.id, status: next, note: milestoneNote(next) },
+            data: { shipmentId: order.shipment.id, status: next, note: noteForStatus(next), lat: wp.lat, lng: wp.lng },
+          });
+          await tx.shipment.update({
+            where: { id: order.shipment.id },
+            data: {
+              status: orderToShipmentStatus(next),
+              currentLat: wp.lat,
+              currentLng: wp.lng,
+              deliveredAt: next === OrderStatus.DELIVERED ? new Date() : undefined,
+            },
           });
         }
         // Convenience: settle a COD order's payment when it's delivered.
