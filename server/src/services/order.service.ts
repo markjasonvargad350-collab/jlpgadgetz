@@ -41,16 +41,32 @@ export interface CreateOrderInput {
 // ── Order-number generation ──────────────────────────────────────────────────
 
 /**
- * Next human-facing order number for today: ORD-YYYYMMDD-####. Sequence is the
- * count of today's orders + 1. Computed inside the transaction; a rare race
- * (two orders racing for the same number) surfaces as a P2002 on the unique
- * `orderNumber` and is retried by the caller.
+ * Next human-facing order number for today: ORD-YYYYMMDD-####. The sequence is
+ * (highest existing sequence for today) + 1 — deliberately NOT a row count.
+ *
+ * A count-based scheme breaks whenever today's numbers aren't the contiguous set
+ * {1..count}: a cancelled/renumbered order, seeded sample data, or a prior
+ * partial failure leaves a hole, so `count + 1` lands on a number that already
+ * exists and then EVERY subsequent order collides for the rest of the day.
+ * Taking max + 1 is monotonic and hole-proof. Numbers are zero-padded to 4
+ * digits, so ordering by `orderNumber` descending equals ordering by sequence
+ * numerically (within a single day's prefix).
+ *
+ * Two orders racing on the same day can still read the same max under Read
+ * Committed and generate the same number; that surfaces as a P2002 and is
+ * retried by the caller, which regenerates against the now-higher max.
  */
 async function nextOrderNumber(tx: Prisma.TransactionClient, now: Date): Promise<string> {
   const stamp = manilaDateStamp(now);
   const prefix = `ORD-${stamp}-`;
-  const todayCount = await tx.order.count({ where: { orderNumber: { startsWith: prefix } } });
-  return `${prefix}${String(todayCount + 1).padStart(4, '0')}`;
+  const last = await tx.order.findFirst({
+    where: { orderNumber: { startsWith: prefix } },
+    orderBy: { orderNumber: 'desc' },
+    select: { orderNumber: true },
+  });
+  const lastSeq = last ? Number(last.orderNumber.slice(prefix.length)) : 0;
+  const nextSeq = (Number.isFinite(lastSeq) ? lastSeq : 0) + 1;
+  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
 }
 
 // ── DTO shaping (Decimal → number for the client) ────────────────────────────
@@ -367,11 +383,15 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
       });
       return dto;
     } catch (err) {
-      const isNumberCollision =
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002' &&
-        String((err.meta as { target?: unknown } | undefined)?.target ?? '').includes('orderNumber');
-      if (isNumberCollision && attempt < MAX_ATTEMPTS) {
+      // Any P2002 raised inside this transaction is a unique clash on a value
+      // derived from the order number — the number itself, or the shipment's
+      // trackingCode (IEX + number). We do NOT inspect err.meta.target: on
+      // pooled/serverless Postgres (Neon) that field is frequently undefined, so
+      // keying the retry off it silently turned real collisions into hard 409s.
+      // Regenerating against the now-higher max resolves either clash.
+      const isUniqueCollision =
+        err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
+      if (isUniqueCollision && attempt < MAX_ATTEMPTS) {
         continue; // regenerate the number and try again
       }
       throw err;
