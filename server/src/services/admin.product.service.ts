@@ -62,6 +62,9 @@ function mapVariant(v: AdminDetailVariant) {
     lowStockThreshold: v.lowStockThreshold,
     imageUrl: v.imageUrl,
     isActive: v.isActive,
+    condition: v.condition,
+    batteryHealth: v.batteryHealth,
+    conditionNote: v.conditionNote,
     lowStock: v.stock > 0 && v.stock <= v.lowStockThreshold,
     // Presence of any ledger or sale row means the variant can't be hard-deleted.
     hasHistory: v._count.inventoryTransactions > 0 || v._count.orderItems > 0,
@@ -82,6 +85,8 @@ function toAdminDetail(p: AdminDetailRow) {
     basePrice: p.basePrice.toNumber(),
     discountPct: p.discountPct,
     status: p.status,
+    installmentAvailable: p.installmentAvailable,
+    installmentMinDownPct: p.installmentMinDownPct,
     isFeatured: p.isFeatured,
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
@@ -136,6 +141,9 @@ function mapVariantDetail(v: AdminVariantRow) {
     lowStockThreshold: v.lowStockThreshold,
     imageUrl: v.imageUrl,
     isActive: v.isActive,
+    condition: v.condition,
+    batteryHealth: v.batteryHealth,
+    conditionNote: v.conditionNote,
     lowStock: v.stock > 0 && v.stock <= v.lowStockThreshold,
     hasHistory: v._count.inventoryTransactions > 0 || v._count.orderItems > 0,
     product: v.product,
@@ -205,6 +213,8 @@ export async function createProduct(input: CreateProductInput, adminId?: string)
         basePrice: money(input.basePrice),
         discountPct: input.discountPct ?? 0,
         status: input.status ?? ProductStatus.DRAFT,
+        installmentAvailable: input.installmentAvailable ?? false,
+        installmentMinDownPct: input.installmentMinDownPct ?? 0,
         isFeatured: input.isFeatured ?? false,
         isNewArrival: input.isNewArrival ?? false,
         isBestSeller: input.isBestSeller ?? false,
@@ -232,6 +242,9 @@ export async function createProduct(input: CreateProductInput, adminId?: string)
           lowStockThreshold: v.lowStockThreshold ?? 5,
           imageUrl: v.imageUrl,
           isActive: v.isActive ?? true,
+          condition: v.condition,
+          batteryHealth: v.batteryHealth,
+          conditionNote: v.conditionNote,
         },
       });
       if (v.initialStock && v.initialStock > 0) {
@@ -275,6 +288,8 @@ export async function updateProduct(id: string, input: UpdateProductInput, admin
   if (input.basePrice !== undefined) data.basePrice = money(input.basePrice);
   if (input.discountPct !== undefined) data.discountPct = input.discountPct;
   if (input.status !== undefined) data.status = input.status;
+  if (input.installmentAvailable !== undefined) data.installmentAvailable = input.installmentAvailable;
+  if (input.installmentMinDownPct !== undefined) data.installmentMinDownPct = input.installmentMinDownPct;
   if (input.isFeatured !== undefined) data.isFeatured = input.isFeatured;
   if (input.isNewArrival !== undefined) data.isNewArrival = input.isNewArrival;
   if (input.isBestSeller !== undefined) data.isBestSeller = input.isBestSeller;
@@ -359,6 +374,9 @@ export async function addVariant(productId: string, input: VariantCreateInput, a
         lowStockThreshold: input.lowStockThreshold ?? 5,
         imageUrl: input.imageUrl,
         isActive: input.isActive ?? true,
+        condition: input.condition,
+        batteryHealth: input.batteryHealth,
+        conditionNote: input.conditionNote,
       },
     });
     if (input.initialStock && input.initialStock > 0) {
@@ -401,6 +419,9 @@ export async function updateVariant(id: string, input: VariantUpdateInput, admin
   if (input.lowStockThreshold !== undefined) data.lowStockThreshold = input.lowStockThreshold;
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
   if (input.isActive !== undefined) data.isActive = input.isActive;
+  if (input.condition !== undefined) data.condition = input.condition;
+  if (input.batteryHealth !== undefined) data.batteryHealth = input.batteryHealth;
+  if (input.conditionNote !== undefined) data.conditionNote = input.conditionNote;
 
   await prisma.productVariant.update({ where: { id }, data });
 

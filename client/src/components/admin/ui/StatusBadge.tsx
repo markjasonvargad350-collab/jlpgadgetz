@@ -1,5 +1,7 @@
 import type { ProductStatus, StockStatus } from '../../../types/admin';
 import type { OrderStatus, PaymentStatus } from '../../../types/order';
+import type { TradeInStatus } from '../../../types/tradeIn';
+import type { InstallmentStatus, InstallmentPaymentStatus } from '../../../types/installment';
 
 /** Soft tinted pill palettes. Numeric shades come from Tailwind's default theme
  *  (augmented, not replaced, by the Sunset-Glass brand tokens). */
@@ -76,5 +78,57 @@ const PAYMENT_STATUS: Record<PaymentStatus, { label: string; tone: BadgeTone }> 
 
 export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
   const s = PAYMENT_STATUS[status] ?? { label: status, tone: 'slate' as const };
+  return <Badge label={s.label} tone={s.tone} dot />;
+}
+
+// Trade-in workflow: neutral at intake → cool under inspection → brand once staff
+// have priced it → green when accepted/closed; declined and cancelled are muted rose.
+const TRADE_IN_STATUS: Record<TradeInStatus, { label: string; tone: BadgeTone }> = {
+  SUBMITTED: { label: 'Submitted', tone: 'slate' },
+  REVIEWING: { label: 'Reviewing', tone: 'sky' },
+  QUOTED: { label: 'Quoted', tone: 'brand' },
+  ACCEPTED: { label: 'Accepted', tone: 'violet' },
+  COMPLETED: { label: 'Completed', tone: 'emerald' },
+  DECLINED: { label: 'Declined', tone: 'rose' },
+  CANCELLED: { label: 'Cancelled', tone: 'rose' },
+};
+
+export function TradeInStatusBadge({ status }: { status: TradeInStatus }) {
+  const s = TRADE_IN_STATUS[status] ?? { label: status, tone: 'slate' as const };
+  return <Badge label={s.label} tone={s.tone} dot />;
+}
+
+const INSTALLMENT_STATUS: Record<InstallmentStatus, { label: string; tone: BadgeTone }> = {
+  PENDING: { label: 'Pending', tone: 'amber' },
+  APPROVED: { label: 'Approved', tone: 'sky' },
+  ACTIVE: { label: 'Active', tone: 'violet' },
+  COMPLETED: { label: 'Completed', tone: 'emerald' },
+  REJECTED: { label: 'Rejected', tone: 'rose' },
+  CANCELLED: { label: 'Cancelled', tone: 'rose' },
+};
+
+export function InstallmentStatusBadge({ status }: { status: InstallmentStatus }) {
+  const s = INSTALLMENT_STATUS[status] ?? { label: status, tone: 'slate' as const };
+  return <Badge label={s.label} tone={s.tone} dot />;
+}
+
+const INSTALLMENT_PAYMENT_STATUS: Record<InstallmentPaymentStatus, { label: string; tone: BadgeTone }> = {
+  PENDING: { label: 'Unpaid', tone: 'slate' },
+  PAID: { label: 'Paid', tone: 'emerald' },
+};
+
+/**
+ * One schedule row's state. "Overdue" is deliberately not a stored status — pass
+ * `overdue` when `dueDate` has passed and the row is still unpaid.
+ */
+export function InstallmentPaymentStatusBadge({
+  status,
+  overdue = false,
+}: {
+  status: InstallmentPaymentStatus;
+  overdue?: boolean;
+}) {
+  if (status === 'PENDING' && overdue) return <Badge label="Overdue" tone="rose" dot />;
+  const s = INSTALLMENT_PAYMENT_STATUS[status] ?? { label: status, tone: 'slate' as const };
   return <Badge label={s.label} tone={s.tone} dot />;
 }

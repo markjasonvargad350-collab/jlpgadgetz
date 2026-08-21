@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, Search, ShoppingCart, Sparkles, X } from 'lucide-react';
+import { Menu, Search, ShoppingCart, X } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 
 const NAV_LINKS = [
   { label: 'Home', to: '/' },
-  { label: 'iPhones', to: '/shop?category=iphone' },
-  { label: 'Shop All', to: '/shop' },
-  { label: 'Deals', to: '/shop?deal=true' },
+  { label: 'Shop', to: '/shop' },
+  { label: 'Trade-In', to: '/trade-in' },
+  { label: 'Installment', to: '/installment' },
+  { label: 'About', to: '/about' },
 ];
 
 export function StoreNav() {
@@ -43,10 +44,14 @@ export function StoreNav() {
       <div className="flex items-center gap-3 rounded-full glass px-4 py-2.5 sm:gap-5 sm:px-5">
         {/* brand */}
         <Link to="/" className="flex shrink-0 items-center gap-2 font-display text-lg font-bold">
-          <span className="grid h-8 w-8 place-items-center rounded-xl brand-gradient text-white">
-            <Sparkles size={18} />
-          </span>
-          <span className="hidden sm:inline">iStore</span>
+          <img
+            src="/brand-logo.png"
+            alt="JLP Gadgetz Center logo"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 rounded-full object-contain"
+          />
+          <span className="hidden sm:inline">JLP Gadgetz Center</span>
         </Link>
 
         {/* desktop links */}
@@ -74,7 +79,7 @@ export function StoreNav() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search iPhones…"
+              placeholder="Search phones & gadgets…"
               className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft"
               aria-label="Search products"
             />
@@ -130,7 +135,7 @@ export function StoreNav() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search iPhones…"
+                placeholder="Search phones & gadgets…"
                 className="w-full bg-transparent text-sm outline-none placeholder:text-ink-soft"
                 aria-label="Search products"
               />

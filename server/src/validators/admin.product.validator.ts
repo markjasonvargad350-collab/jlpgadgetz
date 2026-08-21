@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 const statusEnum = z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED']);
+const conditionEnum = z.enum(['NEW', 'OPEN_BOX', 'PREOWNED', 'REFURBISHED']);
 const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Use a #RRGGBB hex color');
+// Battery health only makes sense for pre-owned/refurbished units (0–100%).
+const batteryHealthField = z.number().int().min(0).max(100);
 
 export const imageInputSchema = z.object({
   url: z.string().trim().min(1).max(1000),
@@ -19,6 +22,10 @@ export const variantCreateSchema = z.object({
   lowStockThreshold: z.number().int().min(0).max(100_000).optional(),
   imageUrl: z.string().trim().max(1000).optional(),
   isActive: z.boolean().optional(),
+  // Pre-owned support — defaults to NEW when omitted.
+  condition: conditionEnum.optional(),
+  batteryHealth: batteryHealthField.optional(),
+  conditionNote: z.string().trim().max(500).optional(),
 });
 
 export const createProductSchema = z.object({
@@ -37,6 +44,9 @@ export const createProductSchema = z.object({
   isDeal: z.boolean().optional(),
   releaseYear: z.number().int().min(2000).max(2100).optional(),
   categoryId: z.string().trim().min(1),
+  // Per-product installment opt-in + minimum down payment (% of price, 0–90).
+  installmentAvailable: z.boolean().optional(),
+  installmentMinDownPct: z.number().int().min(0).max(90).optional(),
   images: z.array(imageInputSchema).max(12).optional(),
   variants: z.array(variantCreateSchema).max(60).optional(),
 });
@@ -58,6 +68,8 @@ export const updateProductSchema = z
     isDeal: z.boolean().optional(),
     releaseYear: z.number().int().min(2000).max(2100).nullable().optional(),
     categoryId: z.string().trim().min(1).optional(),
+    installmentAvailable: z.boolean().optional(),
+    installmentMinDownPct: z.number().int().min(0).max(90).optional(),
   })
   .refine((o) => Object.keys(o).length > 0, { message: 'Provide at least one field to update' });
 
@@ -71,6 +83,9 @@ export const variantUpdateSchema = z
     lowStockThreshold: z.number().int().min(0).max(100_000).optional(),
     imageUrl: z.string().trim().max(1000).nullable().optional(),
     isActive: z.boolean().optional(),
+    condition: conditionEnum.optional(),
+    batteryHealth: batteryHealthField.nullable().optional(),
+    conditionNote: z.string().trim().max(500).nullable().optional(),
   })
   .refine((o) => Object.keys(o).length > 0, { message: 'Provide at least one field to update' });
 

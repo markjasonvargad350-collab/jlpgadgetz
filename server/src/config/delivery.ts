@@ -29,7 +29,7 @@ export interface RouteWaypoint {
 
 // ── Fixed reference points (Metro Manila) ────────────────────────────────────
 
-export const WAREHOUSE: NamedPlace = { lat: 14.5995, lng: 120.9842, label: 'iStore Warehouse — Manila' };
+export const WAREHOUSE: NamedPlace = { lat: 14.5995, lng: 120.9842, label: 'JLP Gadgetz Center — Dispatch' };
 export const HUB: NamedPlace = { lat: 14.6349, lng: 121.0177, label: 'Distribution Hub — San Juan' };
 
 /** Fallback destination (~geographic centre of Metro Manila) for unknown cities. */
@@ -159,7 +159,7 @@ export function orderToShipmentStatus(status: OrderStatus): ShipmentStatus {
 
 // ── Courier + ETA ─────────────────────────────────────────────────────────────
 
-export const DEFAULT_COURIER = 'iStore Express';
+export const DEFAULT_COURIER = 'JLP Express';
 
 /** Simulated lead time from dispatch to arrival. */
 export const ETA_HOURS = 72;

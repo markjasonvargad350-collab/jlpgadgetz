@@ -197,7 +197,7 @@ export default function TrackingMap({ shipment }: { shipment: ShipmentDTO }) {
         )}
 
         <Marker position={[origin.lat, origin.lng]} icon={ORIGIN_ICON}>
-          <Tooltip>iStore Warehouse</Tooltip>
+          <Tooltip>JLP Gadgetz Center</Tooltip>
         </Marker>
         <Marker position={[destination.lat, destination.lng]} icon={DEST_ICON}>
           <Tooltip>Destination</Tooltip>

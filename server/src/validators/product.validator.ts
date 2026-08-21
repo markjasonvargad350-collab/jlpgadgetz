@@ -10,6 +10,7 @@ export const productQuerySchema = z.object({
   bestSeller: boolParam.optional(),
   newArrival: boolParam.optional(),
   deal: boolParam.optional(),
+  installment: boolParam.optional(),
   inStock: boolParam.optional(),
   minPrice: z.coerce.number().nonnegative().optional(),
   maxPrice: z.coerce.number().nonnegative().optional(),

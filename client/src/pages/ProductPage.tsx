@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
+  BatteryMedium,
   Check,
   ChevronRight,
+  CreditCard,
+  Info,
   Minus,
   Plus,
   ShieldCheck,
@@ -16,7 +19,8 @@ import { useProduct } from '../hooks/useProduct';
 import { useCart } from '../contexts/CartContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
-import type { ProductColor, ProductVariant } from '../types/api';
+import { CONDITION_LABELS, sortConditions } from '../config/condition';
+import type { ProductColor, ProductCondition, ProductVariant } from '../types/api';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
 
@@ -28,6 +32,9 @@ export function ProductPage() {
 
   const [storage, setStorage] = useState<string | null>(null);
   const [color, setColor] = useState<string | null>(null);
+  // Condition is part of a variant's identity (a NEW and a PREOWNED unit can
+  // share the same storage + colour), so it has to be part of the selection.
+  const [condition, setCondition] = useState<ProductCondition | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
@@ -38,12 +45,14 @@ export function ProductPage() {
     const first = product.variants.find((v) => v.inStock) ?? product.variants[0];
     setStorage(first?.storage ?? null);
     setColor(first?.color ?? null);
+    setCondition(first?.condition ?? null);
     setActiveIndex(0);
     setQty(1);
   }, [product]);
 
   const storages = useMemo(() => uniqueStorages(product?.variants ?? []), [product]);
   const colors = useMemo(() => uniqueColors(product?.variants ?? []), [product]);
+  const conditions = useMemo(() => uniqueConditions(product?.variants ?? []), [product]);
 
   useDocumentTitle(product?.name);
 
@@ -69,35 +78,68 @@ export function ProductPage() {
 
   const variants = product.variants;
   const selected: ProductVariant | null =
-    variants.find((v) => v.storage === storage && v.color === color) ?? null;
+    variants.find((v) => v.storage === storage && v.color === color && v.condition === condition) ?? null;
 
   const gallery = product.images;
   const mainSrc = gallery[activeIndex]?.url ?? selected?.image ?? gallery[0]?.url ?? null;
   const maxQty = Math.max(1, selected?.stock ?? 1);
 
-  function selectStorage(s: string) {
-    const match = variants.find((v) => v.storage === s && v.color === color) ?? variants.find((v) => v.storage === s);
-    if (!match) return;
-    setStorage(match.storage);
-    setColor(match.color);
-    setQty(1);
-    setAdded(false);
-  }
+  type Selection = { storage: string; color: string; condition: ProductCondition };
 
-  function selectColor(c: string) {
-    const match = variants.find((v) => v.color === c && v.storage === storage) ?? variants.find((v) => v.color === c);
+  /**
+   * Move the selection along one dimension. We try to keep the dimensions the
+   * customer didn't touch, relaxing them one at a time until a real variant
+   * matches — so switching storage on a pre-owned unit stays pre-owned when such
+   * a variant exists, and falls back gracefully when it doesn't.
+   */
+  function pick(change: Partial<Selection>) {
+    const keeps = (v: ProductVariant, keys: (keyof Selection)[]) =>
+      keys.every((k) => v[k] === change[k]);
+    const changed = Object.keys(change) as (keyof Selection)[];
+    const want: Selection = {
+      storage: storage ?? '',
+      color: color ?? '',
+      condition: condition ?? 'NEW',
+      ...change,
+    };
+
+    const match =
+      variants.find(
+        (v) => v.storage === want.storage && v.color === want.color && v.condition === want.condition,
+      ) ??
+      variants.find((v) => keeps(v, changed) && v.condition === want.condition && v.color === want.color) ??
+      variants.find((v) => keeps(v, changed) && v.condition === want.condition) ??
+      variants.find((v) => keeps(v, changed) && v.color === want.color) ??
+      variants.find((v) => keeps(v, changed));
     if (!match) return;
+
     setStorage(match.storage);
     setColor(match.color);
+    setCondition(match.condition);
     setQty(1);
     setAdded(false);
   }
 
   function storageAvailable(s: string) {
-    return variants.some((v) => v.storage === s && (color ? v.color === color : true) && v.inStock);
+    return variants.some(
+      (v) =>
+        v.storage === s &&
+        (color ? v.color === color : true) &&
+        (condition ? v.condition === condition : true) &&
+        v.inStock,
+    );
   }
   function colorAvailable(c: string) {
-    return variants.some((v) => v.color === c && (storage ? v.storage === storage : true) && v.inStock);
+    return variants.some(
+      (v) =>
+        v.color === c &&
+        (storage ? v.storage === storage : true) &&
+        (condition ? v.condition === condition : true) &&
+        v.inStock,
+    );
+  }
+  function conditionAvailable(c: ProductCondition) {
+    return variants.some((v) => v.condition === c && v.inStock);
   }
 
   function buildCartItem() {
@@ -107,7 +149,12 @@ export function ProductPage() {
       productId: product.id,
       slug: product.slug,
       productName: product.name,
-      variantLabel: `${selected.storage} · ${selected.color}`,
+      // Pre-owned units carry their condition into the cart so a customer never
+      // loses track of which unit they picked.
+      variantLabel:
+        selected.condition === 'NEW'
+          ? `${selected.storage} · ${selected.color}`
+          : `${selected.storage} · ${selected.color} · ${CONDITION_LABELS[selected.condition]}`,
       colorHex: selected.colorHex,
       image: mainSrc,
       unitPrice: selected.price,
@@ -197,6 +244,32 @@ export function ProductPage() {
           </p>
           <StockLine variant={selected} />
 
+          {/* condition — only shown when this product has more than one */}
+          {conditions.length > 1 && (
+            <div className="mt-6">
+              <p className="mb-2 text-sm font-semibold">Condition</p>
+              <div className="flex flex-wrap gap-2">
+                {conditions.map((c) => {
+                  const isSel = c === condition;
+                  const avail = conditionAvailable(c);
+                  return (
+                    <button
+                      key={c}
+                      onClick={() => pick({ condition: c })}
+                      className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
+                        isSel
+                          ? 'brand-gradient text-white shadow-sm'
+                          : `glass text-ink hover:bg-white/80 ${avail ? '' : 'opacity-50'}`
+                      }`}
+                    >
+                      {CONDITION_LABELS[c]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* storage */}
           {storages.length > 0 && (
             <div className="mt-6">
@@ -208,7 +281,7 @@ export function ProductPage() {
                   return (
                     <button
                       key={s}
-                      onClick={() => selectStorage(s)}
+                      onClick={() => pick({ storage: s })}
                       className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${
                         isSel
                           ? 'brand-gradient text-white shadow-sm'
@@ -236,7 +309,7 @@ export function ProductPage() {
                   return (
                     <button
                       key={c.name}
-                      onClick={() => selectColor(c.name)}
+                      onClick={() => pick({ color: c.name })}
                       title={c.name}
                       aria-label={c.name}
                       className={`grid h-9 w-9 place-items-center rounded-full transition-all ${
@@ -251,6 +324,28 @@ export function ProductPage() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* pre-owned disclosure — only what the owner actually recorded */}
+          {selected && selected.condition !== 'NEW' && (
+            <div className="mt-5 rounded-2xl border border-white/70 bg-white/60 p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <Info size={15} className="text-brand-600" />
+                {CONDITION_LABELS[selected.condition]} unit
+              </p>
+              {selected.batteryHealth != null && (
+                <p className="mt-2 flex items-center gap-2 text-sm text-ink-soft">
+                  <BatteryMedium size={15} className="text-brand-600" />
+                  Battery health {selected.batteryHealth}%
+                </p>
+              )}
+              {selected.conditionNote && (
+                <p className="mt-2 text-sm text-ink-soft">{selected.conditionNote}</p>
+              )}
+              <p className="mt-2 text-xs text-ink-soft">
+                Inspected and tested in store. Ask us anything about this unit before you buy.
+              </p>
             </div>
           )}
 
@@ -296,6 +391,30 @@ export function ProductPage() {
 
           {!canBuy && (
             <p className="mt-3 text-sm font-medium text-coral">This option is currently sold out.</p>
+          )}
+
+          {/* installment — only for products the owner opted in */}
+          {product.installmentAvailable && (
+            <div className="mt-5 rounded-2xl border border-white/70 bg-white/60 p-4">
+              <p className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <CreditCard size={15} className="text-brand-600" />
+                Prefer to pay monthly?
+              </p>
+              <p className="mt-1 text-sm text-ink-soft">
+                Split this into 3, 6, 9 or 12 months — the price divided by the term, with no interest or
+                added fees.
+              </p>
+              <Link
+                to={
+                  selected
+                    ? `/installment?product=${product.slug}&variantId=${selected.id}`
+                    : `/installment?product=${product.slug}`
+                }
+                className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:text-brand-800"
+              >
+                Apply for installment <ChevronRight size={14} />
+              </Link>
+            </div>
           )}
 
           {/* reassurance */}
@@ -364,6 +483,11 @@ function uniqueColors(variants: ProductVariant[]): ProductColor[] {
     }
   }
   return out;
+}
+
+/** Distinct conditions across the active variants, best-first. */
+function uniqueConditions(variants: ProductVariant[]): ProductCondition[] {
+  return sortConditions([...new Set(variants.map((v) => v.condition))]);
 }
 
 function Tag({ children, tone = 'brand' }: { children: React.ReactNode; tone?: 'brand' | 'deal' }) {

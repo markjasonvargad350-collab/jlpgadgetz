@@ -15,6 +15,7 @@ import { paymentProvider, paymentInstructions } from './payment.service';
 import { deliveryProvider } from './delivery.service';
 import { routeFor, type GeoPoint } from '../config/delivery';
 import { logAudit } from './audit.service';
+import { assertBranchSelectable } from './branch.service';
 import { manilaDateStamp } from '../utils/time';
 
 // ── Inputs (already validated + coerced by the order validator) ──────────────
@@ -36,6 +37,8 @@ export interface CreateOrderInput {
   };
   paymentMethod: PaymentMethod;
   items: OrderItemInput[];
+  /** Optional preferred pickup/handover branch. Does NOT affect pricing or stock. */
+  branchId?: string;
 }
 
 // ── Order-number generation ──────────────────────────────────────────────────
@@ -86,6 +89,8 @@ export const orderInclude = {
   payment: true,
   // Fulfillment + tracking timeline (admin detail; guest lookup ignores it).
   shipment: { include: { history: { orderBy: { createdAt: 'asc' } } } },
+  // Customer's chosen preferred branch (nullable — most orders have none).
+  branch: { select: { id: true, name: true, city: true, province: true } },
 } satisfies Prisma.OrderInclude;
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
@@ -149,6 +154,8 @@ export interface OrderDTO {
   total: number;
   payment: { reference: string | null; instructions: string };
   updatedAt: string;
+  /** Customer's chosen preferred branch (null when none was selected). */
+  branch: { id: string; name: string; city: string | null; province: string | null } | null;
   /** Fulfillment + tracking timeline (+ simulated geo). Present once a shipment exists; null otherwise. */
   shipment: {
     status: ShipmentStatus;
@@ -202,6 +209,9 @@ export function toOrderDTO(o: OrderRow): OrderDTO {
       instructions: paymentInstructions(o.paymentMethod, o.total.toNumber()),
     },
     updatedAt: o.updatedAt.toISOString(),
+    branch: o.branch
+      ? { id: o.branch.id, name: o.branch.name, city: o.branch.city, province: o.branch.province }
+      : null,
     shipment: o.shipment ? toShipmentDTO(o.shipment) : null,
   };
 }
@@ -224,6 +234,13 @@ export function toOrderDTO(o: OrderRow): OrderDTO {
 export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
   if (input.items.length === 0) {
     throw ApiError.badRequest('Your cart is empty.');
+  }
+
+  // A chosen branch must be active/selectable. This is purely the customer's
+  // preferred handover branch — it never affects price or stock (catalog is
+  // global). Checked once up front so it isn't re-run on order-number retries.
+  if (input.branchId) {
+    await assertBranchSelectable(input.branchId);
   }
 
   // Merge duplicate variant lines (defensive — client shouldn't send dupes).
@@ -308,6 +325,7 @@ export async function createOrder(input: CreateOrderInput): Promise<OrderDTO> {
               province: input.address.province,
               postalCode: input.address.postalCode,
               addressNote: input.address.addressNote ?? null,
+              branchId: input.branchId ?? null,
               subtotal,
               deliveryFee,
               total,

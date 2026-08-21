@@ -51,6 +51,11 @@ export interface CreateOrderRequest {
   address: CheckoutAddress;
   paymentMethod: PaymentMethod;
   items: { variantId: string; quantity: number }[];
+  /**
+   * Preferred JLP branch. Optional and purely informational — stock is global,
+   * so this never changes prices or availability.
+   */
+  branchId?: string;
 }
 
 export interface OrderItemDTO {

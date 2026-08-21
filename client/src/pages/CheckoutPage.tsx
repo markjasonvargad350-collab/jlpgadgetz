@@ -14,11 +14,13 @@ import {
   Wallet,
 } from 'lucide-react';
 import { useCart } from '../contexts/CartContext';
+import { useBranches } from '../hooks/useBranches';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
 import { estimateDeliveryFee, FREE_DELIVERY_THRESHOLD } from '../config/order';
 import { createOrder } from '../services/orders';
 import { ApiError } from '../services/http';
+import { BranchPicker } from '../components/store/BranchPicker';
 import type { CreateOrderRequest, PaymentMethod, StockConflictDetails } from '../types/order';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
@@ -171,9 +173,11 @@ export function CheckoutPage() {
   const { items, subtotal, count, setQuantity, removeItem, clear } = useCart();
   const navigate = useNavigate();
   useDocumentTitle('Checkout');
+  const { data: branches } = useBranches();
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  const [branchId, setBranchId] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -224,6 +228,7 @@ export function CheckoutPage() {
       paymentMethod,
       // Only variant + quantity leave the browser — never prices or names.
       items: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+      ...(branchId ? { branchId } : {}),
     };
 
     setSubmitting(true);
@@ -378,6 +383,23 @@ export function CheckoutPage() {
               <Lock size={12} /> Payments are handled securely server-side — card and wallet secrets never touch this browser.
             </p>
           </section>
+
+          {branches.length > 0 && (
+            <section className="glass rounded-3xl p-6">
+              <h2 className="font-display text-lg font-bold">Preferred branch</h2>
+              <p className="mt-1 mb-4 text-sm text-ink-soft">
+                Which JLP branch should handle this order? Prices and stock are the same everywhere — this
+                just tells us who to route it to.
+              </p>
+              <BranchPicker
+                branches={branches}
+                value={branchId}
+                onChange={setBranchId}
+                name="orderBranch"
+                noneLabel="No preference — whichever is fastest"
+              />
+            </section>
+          )}
         </div>
 
         {/* ── Right: summary ── */}

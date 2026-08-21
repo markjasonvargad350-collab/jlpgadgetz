@@ -4,14 +4,45 @@ const php = new Intl.NumberFormat('en-PH', {
   maximumFractionDigits: 0,
 });
 
+/** Peso formatter that keeps centavos — for installment amounts, which divide. */
+const phpExact = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 /** Format a peso amount, e.g. 89990 → "₱89,990". */
 export function formatPHP(amount: number): string {
   return php.format(amount);
 }
 
+/**
+ * Format a peso amount to the centavo, e.g. 8332.5 → "₱8,332.50". Use for
+ * installment monthlies and schedule rows, where dividing a price by a term
+ * legitimately produces centavos and rounding the display would hide them.
+ */
+export function formatPHPExact(amount: number): string {
+  return phpExact.format(amount);
+}
+
 /** Format a price range; collapses to a single value when from === to. */
 export function formatPriceRange(from: number, to: number): string {
   return from === to ? formatPHP(from) : `${formatPHP(from)} – ${formatPHP(to)}`;
+}
+
+/**
+ * One-line location for a branch. Prefers the real street address when the owner
+ * has entered one, otherwise falls back to city/province — we never synthesise a
+ * street for branches that don't have one on record.
+ */
+export function formatBranchLocation(branch: {
+  addressLine?: string | null;
+  city?: string | null;
+  province?: string | null;
+}): string {
+  if (branch.addressLine) return branch.addressLine;
+  return [branch.city, branch.province].filter(Boolean).join(', ');
 }
 
 // ── Dates ────────────────────────────────────────────────────────────────────

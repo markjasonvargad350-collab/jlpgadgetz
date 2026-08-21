@@ -15,6 +15,10 @@ export interface ProductFieldsValue {
   discountPct: string;
   releaseYear: string;
   status: ProductStatus;
+  /** Lets customers apply to pay this product monthly (price ÷ term). */
+  installmentAvailable: boolean;
+  /** Smallest accepted down payment as a % of the price (0–90). */
+  installmentMinDownPct: string;
   isFeatured: boolean;
   isNewArrival: boolean;
   isBestSeller: boolean;
@@ -32,6 +36,8 @@ export const emptyProductFields: ProductFieldsValue = {
   discountPct: '0',
   releaseYear: '',
   status: 'DRAFT',
+  installmentAvailable: false,
+  installmentMinDownPct: '0',
   isFeatured: false,
   isNewArrival: false,
   isBestSeller: false,
@@ -137,6 +143,49 @@ export function ProductFields({
             );
           })}
         </div>
+      </div>
+
+      {/* Installment opt-in. Monthly = price ÷ term, computed server-side — there
+          is no interest or fee to configure here. */}
+      <div className="rounded-2xl bg-white/50 p-4 sm:col-span-2">
+        <span className="block text-sm font-semibold text-ink">Installment</span>
+        <p className="mt-1 text-xs text-ink-soft">
+          Let customers apply to pay this product monthly. The monthly amount is simply the price divided by the term
+          they pick (3, 6, 9 or 12 months) — no interest or extra fees are added.
+        </p>
+        <button
+          type="button"
+          onClick={() => onChange({ installmentAvailable: !value.installmentAvailable })}
+          aria-pressed={value.installmentAvailable}
+          className={`mt-3 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            value.installmentAvailable
+              ? 'brand-gradient text-white shadow-sm'
+              : 'bg-white/60 text-ink-soft ring-1 ring-white/70 hover:text-ink'
+          }`}
+        >
+          {value.installmentAvailable ? 'Installment allowed' : 'Installment off'}
+        </button>
+
+        {value.installmentAvailable && (
+          <div className="mt-4 sm:max-w-xs">
+            <Field
+              label="Minimum down payment %"
+              htmlFor="p-mindown"
+              error={errors.installmentMinDownPct}
+              hint="0–90. Use 0 to accept no down payment."
+            >
+              <Input
+                id="p-mindown"
+                type="number"
+                min={0}
+                max={90}
+                step={1}
+                value={value.installmentMinDownPct}
+                onChange={(e) => onChange({ installmentMinDownPct: e.target.value })}
+              />
+            </Field>
+          </div>
+        )}
       </div>
     </div>
   );

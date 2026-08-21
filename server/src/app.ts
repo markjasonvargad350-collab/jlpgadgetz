@@ -20,7 +20,13 @@ import adminInventoryRouter from './routes/admin.inventory.routes';
 import adminOrderRouter from './routes/admin.order.routes';
 import adminShipmentRouter from './routes/admin.shipment.routes';
 import adminReportRouter from './routes/admin.report.routes';
+import adminBranchRouter from './routes/admin.branch.routes';
+import adminTradeInRouter from './routes/admin.tradein.routes';
+import adminInstallmentRouter from './routes/admin.installment.routes';
 import orderRouter from './routes/order.routes';
+import branchRouter from './routes/branch.routes';
+import tradeInRouter from './routes/tradein.routes';
+import installmentRouter from './routes/installment.routes';
 
 /**
  * Build the Express application. Kept as a factory so tests can create isolated
@@ -107,7 +113,7 @@ export function createApp(): Application {
   // Cache policy: everything authed or PII-bearing is never stored; public
   // catalog reads are briefly cacheable (the error handler downgrades any
   // failed response back to no-store, so 404s/500s are never cached).
-  app.use(['/api/admin', '/api/orders'], noStore);
+  app.use(['/api/admin', '/api/orders', '/api/trade-ins', '/api/installments'], noStore);
 
   // ── Feature routers ──
   // Auth is mounted first so /api/admin/auth/* resolves before the catch-all
@@ -118,10 +124,16 @@ export function createApp(): Application {
   app.use('/api/admin/orders', adminOrderRouter);
   app.use('/api/admin/shipments', adminShipmentRouter);
   app.use('/api/admin/reports', adminReportRouter);
+  app.use('/api/admin/branches', adminBranchRouter);
+  app.use('/api/admin/trade-ins', adminTradeInRouter);
+  app.use('/api/admin/installments', adminInstallmentRouter);
   app.use('/api/admin', adminProductRouter);
   app.use('/api/products', publicCache(), productRouter);
   app.use('/api/categories', publicCache(), categoryRouter);
+  app.use('/api/branches', publicCache(), branchRouter);
   app.use('/api/orders', orderRouter);
+  app.use('/api/trade-ins', tradeInRouter);
+  app.use('/api/installments', installmentRouter);
 
   // 404 + centralized error handling (must be last)
   app.use(notFound);

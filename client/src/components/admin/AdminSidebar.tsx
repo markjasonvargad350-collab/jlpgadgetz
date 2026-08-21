@@ -1,5 +1,5 @@
 import { Link, NavLink } from 'react-router-dom';
-import { BarChart3, Boxes, LayoutDashboard, Package, ShoppingBag, Sparkles } from 'lucide-react';
+import { BarChart3, Boxes, CalendarClock, LayoutDashboard, Package, Repeat, ShoppingBag, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 
@@ -15,6 +15,9 @@ const NAV: NavItem[] = [
   { to: '/admin/orders', label: 'Orders', icon: ShoppingBag },
   { to: '/admin/products', label: 'Products', icon: Package },
   { to: '/admin/inventory', label: 'Inventory', icon: Boxes },
+  { to: '/admin/trade-ins', label: 'Trade-ins', icon: Repeat },
+  { to: '/admin/installments', label: 'Installments', icon: CalendarClock },
+  { to: '/admin/branches', label: 'Branches', icon: Store },
   { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
 ];
 
@@ -30,11 +33,15 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex h-full flex-col gap-6 p-4">
       {/* brand */}
       <Link to="/admin" onClick={onNavigate} className="flex items-center gap-2.5 px-2 pt-1">
-        <span className="grid h-9 w-9 place-items-center rounded-xl brand-gradient text-white">
-          <Sparkles size={18} />
-        </span>
+        <img
+          src="/brand-logo.png"
+          alt="JLP Gadgetz Center logo"
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0 rounded-full object-contain"
+        />
         <span className="font-display text-lg font-bold">
-          iStore
+          JLP
           <span className="ml-1.5 rounded-full bg-white/70 px-2 py-0.5 align-middle text-[10px] font-bold tracking-wide text-brand-700 uppercase">
             Admin
           </span>

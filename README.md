@@ -111,3 +111,7 @@ The Vite dev server proxies `/api/*` to the backend, so there are no CORS issues
 The app is **deploy-ready** on **Vercel** (frontend) + **Render** (API) + **Neon** (Postgres). Full step-by-step instructions — accounts, environment variables, CORS/cookie wiring, one-time seeding, and a post-deploy checklist — are in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 Config-as-code lives in [`render.yaml`](render.yaml) (Render Blueprint for the API), [`client/vercel.json`](client/vercel.json) (Vercel SPA + Vite preset), and [`server/.env.production.example`](server/.env.production.example) (production env checklist). Set `VITE_API_URL` (Vercel) to the Render API base **including `/api`**, and `CLIENT_URL` (Render) to the Vercel origin(s) — that pair wires the two together for CORS + CSRF. **No secrets belong in the repo or the frontend bundle.**
+
+## For the shop owner
+
+Adding real products (new and pre-owned), setting up the three branches, turning on installments, and running the trade-in / installment queues are all done in the admin panel — no code. The walkthrough is in **[docs/ADD-YOUR-PRODUCTS.md](docs/ADD-YOUR-PRODUCTS.md)**.

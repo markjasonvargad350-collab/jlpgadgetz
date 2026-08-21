@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const BASE_TITLE = 'iStore — Premium iPhones';
+const BASE_TITLE = 'JLP Gadgetz Center — Buy, Sell & Trade';
 
 /**
  * Sets `document.title` for the lifetime of the calling component and restores
@@ -9,7 +9,7 @@ const BASE_TITLE = 'iStore — Premium iPhones';
  */
 export function useDocumentTitle(title?: string | null) {
   useEffect(() => {
-    document.title = title ? `${title} · iStore` : BASE_TITLE;
+    document.title = title ? `${title} · JLP Gadgetz Center` : BASE_TITLE;
     return () => {
       document.title = BASE_TITLE;
     };

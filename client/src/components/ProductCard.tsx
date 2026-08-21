@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Smartphone } from 'lucide-react';
+import { CreditCard, Smartphone } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../types/api';
 import { formatPriceRange } from '../utils/format';
+import { CONDITION_LABELS, sortConditions } from '../config/condition';
 
 /**
  * Frosted product card with warm hover glow. Links to the product detail page;
@@ -10,6 +11,8 @@ import { formatPriceRange } from '../utils/format';
  */
 export function ProductCard({ product }: { product: ProductCardType }) {
   const hasDiscount = product.discountPct > 0;
+  // Only worth calling out when the product isn't purely brand-new stock.
+  const conditionTags = sortConditions(product.conditions).filter((c) => c !== 'NEW');
 
   return (
     <motion.article
@@ -37,6 +40,11 @@ export function ProductCard({ product }: { product: ProductCardType }) {
             {product.isBestSeller && <Badge>Best Seller</Badge>}
             {product.isNewArrival && <Badge>New</Badge>}
             {hasDiscount && <Badge tone="deal">-{product.discountPct}%</Badge>}
+            {conditionTags.map((c) => (
+              <Badge key={c} tone="condition">
+                {CONDITION_LABELS[c]}
+              </Badge>
+            ))}
           </div>
 
           {!product.inStock && (
@@ -73,6 +81,11 @@ export function ProductCard({ product }: { product: ProductCardType }) {
             <p className="font-display text-xl font-extrabold text-gradient">
               {formatPriceRange(product.priceFrom, product.priceTo)}
             </p>
+            {product.installmentAvailable && (
+              <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-brand-700">
+                <CreditCard size={12} /> Installment available
+              </p>
+            )}
           </div>
         </div>
       </Link>
@@ -80,15 +93,21 @@ export function ProductCard({ product }: { product: ProductCardType }) {
   );
 }
 
-function Badge({ children, tone = 'brand' }: { children: React.ReactNode; tone?: 'brand' | 'deal' }) {
+function Badge({
+  children,
+  tone = 'brand',
+}: {
+  children: React.ReactNode;
+  tone?: 'brand' | 'deal' | 'condition';
+}) {
+  const tones: Record<'brand' | 'deal' | 'condition', string> = {
+    brand: 'brand-gradient text-white',
+    deal: 'bg-coral text-white',
+    // Neutral so a pre-owned tag reads as information, not as a promotion.
+    condition: 'bg-ink/75 text-white',
+  };
   return (
-    <span
-      className={
-        tone === 'deal'
-          ? 'rounded-full bg-coral px-2.5 py-1 text-xs font-bold text-white shadow-sm'
-          : 'rounded-full brand-gradient px-2.5 py-1 text-xs font-bold text-white shadow-sm'
-      }
-    >
+    <span className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${tones[tone]}`}>
       {children}
     </span>
   );

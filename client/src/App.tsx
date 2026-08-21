@@ -8,6 +8,9 @@ import { CartPage } from './pages/CartPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
 import { TrackOrderPage } from './pages/TrackOrderPage';
+import { TradeInPage } from './pages/TradeInPage';
+import { InstallmentPage } from './pages/InstallmentPage';
+import { AboutPage } from './pages/AboutPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { RequireAuth } from './routes/RequireAuth';
@@ -26,6 +29,18 @@ const ProductEditPage = lazy(() => import('./pages/admin/ProductEditPage').then(
 const InventoryPage = lazy(() => import('./pages/admin/InventoryPage').then((m) => ({ default: m.InventoryPage })));
 const OrdersPage = lazy(() => import('./pages/admin/OrdersPage').then((m) => ({ default: m.OrdersPage })));
 const OrderDetailPage = lazy(() => import('./pages/admin/OrderDetailPage').then((m) => ({ default: m.OrderDetailPage })));
+const TradeInsPage = lazy(() => import('./pages/admin/TradeInsPage').then((m) => ({ default: m.TradeInsPage })));
+const TradeInDetailPage = lazy(() =>
+  import('./pages/admin/TradeInDetailPage').then((m) => ({ default: m.TradeInDetailPage })),
+);
+const InstallmentsPage = lazy(() =>
+  import('./pages/admin/InstallmentsPage').then((m) => ({ default: m.InstallmentsPage })),
+);
+const InstallmentDetailPage = lazy(() =>
+  import('./pages/admin/InstallmentDetailPage').then((m) => ({ default: m.InstallmentDetailPage })),
+);
+const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then((m) => ({ default: m.BranchesPage })));
+const BranchEditPage = lazy(() => import('./pages/admin/BranchEditPage').then((m) => ({ default: m.BranchEditPage })));
 const ReportsPage = lazy(() => import('./pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 
 /**
@@ -44,6 +59,9 @@ function App() {
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/order/:orderNumber" element={<OrderConfirmationPage />} />
         <Route path="/track-order" element={<TrackOrderPage />} />
+        <Route path="/trade-in" element={<TradeInPage />} />
+        <Route path="/installment" element={<InstallmentPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
@@ -66,6 +84,13 @@ function App() {
             <Route path="products/new" element={<ProductEditPage />} />
             <Route path="products/:id" element={<ProductEditPage />} />
             <Route path="inventory" element={<InventoryPage />} />
+            <Route path="trade-ins" element={<TradeInsPage />} />
+            <Route path="trade-ins/:id" element={<TradeInDetailPage />} />
+            <Route path="installments" element={<InstallmentsPage />} />
+            <Route path="installments/:id" element={<InstallmentDetailPage />} />
+            <Route path="branches" element={<BranchesPage />} />
+            <Route path="branches/new" element={<BranchEditPage />} />
+            <Route path="branches/:id" element={<BranchEditPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Route>

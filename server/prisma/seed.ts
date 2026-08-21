@@ -375,10 +375,18 @@ async function wipe() {
   await prisma.orderItem.deleteMany();
   await prisma.inventoryTransaction.deleteMany();
   await prisma.order.deleteMany();
+  // Buy/Sell/Trade records reference variants and branches, so they go before
+  // both. Payment rows cascade from their plan, but we clear them explicitly to
+  // keep this function's order self-documenting.
+  await prisma.installmentPayment.deleteMany();
+  await prisma.installmentPlan.deleteMany();
+  await prisma.tradeIn.deleteMany();
   await prisma.productVariant.deleteMany();
   await prisma.productImage.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
+  // Branches last of the domain tables — orders/trade-ins/plans all point at them.
+  await prisma.branch.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.user.deleteMany();
@@ -424,6 +432,34 @@ async function main() {
     },
   });
   console.log(`   ✓ Staff user: ${staff.email}`);
+
+  // --- Branches -------------------------------------------------------------
+  // JLP Gadgetz Center's three locations. Stock is GLOBAL — a branch is a
+  // customer-selectable pickup / contact point, never a separate inventory.
+  //
+  // Only Passi has a street address we actually know, so it's the only one with
+  // `addressLine`; the others carry city/province only. `hours` and lat/lng are
+  // deliberately left null rather than invented — the owner fills them in from
+  // Admin → Branches, which is also where the per-branch phone/email live.
+  const branchDefs = [
+    {
+      name: 'Passi Branch',
+      slug: 'passi',
+      city: 'Passi City',
+      province: 'Iloilo',
+      addressLine: 'Dorillo Street, Passi City, Passi, Philippines, 5037',
+      phone: '0930 119 7407',
+      email: 'jlpgadgetzcenter@gmail.com',
+      position: 1,
+      isDefault: true, // pre-selected in pickers
+    },
+    { name: 'Kalibo Branch', slug: 'kalibo', city: 'Kalibo', province: 'Aklan', position: 2 },
+    { name: 'Sara Branch', slug: 'sara', city: 'Sara', province: 'Iloilo', position: 3 },
+  ];
+  for (const b of branchDefs) {
+    await prisma.branch.create({ data: b });
+  }
+  console.log(`   ✓ ${branchDefs.length} branches`);
 
   // --- Categories -----------------------------------------------------------
   const categoryDefs = [
@@ -692,7 +728,7 @@ async function main() {
         data: {
           orderId: order.id,
           status: so.shipmentStatus,
-          courier: 'iStore Express',
+          courier: 'JLP Express',
           trackingCode: `IEX${yyyymmdd(so.placedAt)}${so.seq}`,
           originLat: WAREHOUSE.lat,
           originLng: WAREHOUSE.lng,

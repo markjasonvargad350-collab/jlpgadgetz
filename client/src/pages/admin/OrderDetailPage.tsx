@@ -173,7 +173,7 @@ function ShipmentCard({
               value={courier}
               onChange={(e) => setCourier(e.target.value)}
               maxLength={80}
-              placeholder="iStore Express"
+              placeholder="JLP Express"
               className={inputCls}
             />
           </label>

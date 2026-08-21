@@ -10,6 +10,9 @@ const TITLES: Record<string, string> = {
   orders: 'Orders',
   products: 'Products',
   inventory: 'Inventory',
+  'trade-ins': 'Trade-ins',
+  installments: 'Installments',
+  branches: 'Branches',
   reports: 'Reports',
 };
 

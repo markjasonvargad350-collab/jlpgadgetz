@@ -42,6 +42,8 @@ export const createOrderSchema = z.object({
   }),
   paymentMethod: z.enum(PaymentMethod),
   items: z.array(orderItemSchema).min(1, 'Your cart is empty').max(MAX_ORDER_ITEMS),
+  // Optional preferred pickup/handover branch (validated server-side if present).
+  branchId: z.string().trim().min(1).max(60).optional(),
 });
 
 export type CreateOrderBody = z.infer<typeof createOrderSchema>;

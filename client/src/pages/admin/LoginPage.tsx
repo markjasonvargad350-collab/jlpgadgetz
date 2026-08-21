@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Eye, EyeOff, Lock, Mail, Sparkles } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useAdminAuth } from '../../contexts/AdminAuthContext';
 import { ApiError } from '../../services/http';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
@@ -44,11 +44,15 @@ export function LoginPage() {
       <main className="w-full max-w-md">
         <div className="glass rounded-3xl p-8 sm:p-10">
           <div className="flex flex-col items-center text-center">
-            <span className="grid h-14 w-14 place-items-center rounded-2xl brand-gradient text-white shadow-lg shadow-brand-600/25">
-              <Sparkles size={26} />
-            </span>
-            <h1 className="mt-4 font-display text-2xl font-extrabold">iStore Admin</h1>
-            <p className="mt-1 text-sm text-ink-soft">Sign in to manage orders, stock &amp; reports.</p>
+            <img
+              src="/brand-logo.png"
+              alt="JLP Gadgetz Center logo"
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-2xl object-contain shadow-lg shadow-brand-600/25"
+            />
+            <h1 className="mt-4 font-display text-2xl font-extrabold">JLP Gadgetz Center</h1>
+            <p className="mt-1 text-sm text-ink-soft">Admin portal — sign in to manage orders, stock &amp; reports.</p>
           </div>
 
           {error && (
@@ -69,7 +73,7 @@ export function LoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@istore.test"
+                  placeholder="you@jlpgadgetz.com"
                   className="pl-10"
                 />
               </div>

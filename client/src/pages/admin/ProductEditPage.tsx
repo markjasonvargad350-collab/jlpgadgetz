@@ -35,7 +35,19 @@ function validate(f: ProductFieldsValue): FieldErrors {
   if (!f.description.trim()) errors.description = 'A description is required.';
   const price = Number(f.basePrice);
   if (!f.basePrice.trim() || !Number.isFinite(price) || price <= 0) errors.basePrice = 'Enter a base price greater than zero.';
+  // Only meaningful while installments are on; the server enforces 0–90 too.
+  if (f.installmentAvailable) {
+    const down = Number(f.installmentMinDownPct);
+    if (!f.installmentMinDownPct.trim() || !Number.isInteger(down) || down < 0 || down > 90) {
+      errors.installmentMinDownPct = 'Enter a whole number from 0 to 90.';
+    }
+  }
   return errors;
+}
+
+/** Min-down % is only sent when installments are on, so a stale value can't leak. */
+function minDownPct(f: ProductFieldsValue): number {
+  return f.installmentAvailable ? Number(f.installmentMinDownPct) || 0 : 0;
 }
 
 function productToFields(p: AdminProductDetail): ProductFieldsValue {
@@ -50,6 +62,8 @@ function productToFields(p: AdminProductDetail): ProductFieldsValue {
     discountPct: String(p.discountPct),
     releaseYear: p.releaseYear != null ? String(p.releaseYear) : '',
     status: p.status,
+    installmentAvailable: p.installmentAvailable,
+    installmentMinDownPct: String(p.installmentMinDownPct),
     isFeatured: p.isFeatured,
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
@@ -68,6 +82,8 @@ function toCreateInput(f: ProductFieldsValue): ProductCreateInput {
     basePrice: Number(f.basePrice),
     discountPct: Number(f.discountPct) || 0,
     status: f.status,
+    installmentAvailable: f.installmentAvailable,
+    installmentMinDownPct: minDownPct(f),
     isFeatured: f.isFeatured,
     isNewArrival: f.isNewArrival,
     isBestSeller: f.isBestSeller,
@@ -88,6 +104,8 @@ function toUpdateInput(f: ProductFieldsValue): ProductUpdateInput {
     basePrice: Number(f.basePrice),
     discountPct: Number(f.discountPct) || 0,
     status: f.status,
+    installmentAvailable: f.installmentAvailable,
+    installmentMinDownPct: minDownPct(f),
     isFeatured: f.isFeatured,
     isNewArrival: f.isNewArrival,
     isBestSeller: f.isBestSeller,

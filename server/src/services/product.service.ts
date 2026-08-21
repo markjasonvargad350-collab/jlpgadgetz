@@ -11,6 +11,8 @@ export interface ProductQuery {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
+  /** Only products the owner has opted into installment plans. */
+  installment?: boolean;
   inStock?: boolean;
   minPrice?: number;
   maxPrice?: number;
@@ -40,12 +42,13 @@ const cardSelect = {
   isNewArrival: true,
   isBestSeller: true,
   isDeal: true,
+  installmentAvailable: true,
   category: { select: { slug: true, name: true } },
   images: { select: { url: true, alt: true }, orderBy: { position: 'asc' }, take: 1 },
   variants: {
     where: { isActive: true },
     orderBy: { price: 'asc' },
-    select: { storage: true, color: true, colorHex: true, price: true, stock: true },
+    select: { storage: true, color: true, colorHex: true, price: true, stock: true, condition: true },
   },
 } satisfies Prisma.ProductSelect;
 
@@ -64,6 +67,8 @@ const detailSelect = {
   isNewArrival: true,
   isBestSeller: true,
   isDeal: true,
+  installmentAvailable: true,
+  installmentMinDownPct: true,
   category: { select: { slug: true, name: true } },
   images: { select: { id: true, url: true, alt: true, position: true }, orderBy: { position: 'asc' } },
   variants: {
@@ -79,6 +84,9 @@ const detailSelect = {
       imageUrl: true,
       stock: true,
       lowStockThreshold: true,
+      condition: true,
+      batteryHealth: true,
+      conditionNote: true,
     },
   },
 } satisfies Prisma.ProductSelect;
@@ -99,6 +107,7 @@ function buildWhere(query: ProductQuery): Prisma.ProductWhereInput {
   if (query.bestSeller) where.isBestSeller = true;
   if (query.newArrival) where.isNewArrival = true;
   if (query.deal) where.isDeal = true;
+  if (query.installment) where.installmentAvailable = true;
 
   if (query.q) {
     where.OR = [
@@ -181,6 +190,15 @@ function priceRange(variants: VariantRow[], fallback: Prisma.Decimal): { from: n
   return { from: Math.min(...prices), to: Math.max(...prices) };
 }
 
+// Distinct conditions across a product's active variants (usually just ["NEW"],
+// but a product may carry a pre-owned variant alongside a new one). Lets the
+// storefront show a "Pre-owned" badge when any non-NEW variant exists.
+function uniqueConditions(variants: { condition: string }[]): string[] {
+  const seen = new Set<string>();
+  for (const v of variants) seen.add(v.condition);
+  return [...seen];
+}
+
 function toCard(p: ProductCardRow) {
   const { from, to } = priceRange(p.variants, p.basePrice);
   const totalStock = p.variants.reduce((s, v) => s + v.stock, 0);
@@ -198,12 +216,14 @@ function toCard(p: ProductCardRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    installmentAvailable: p.installmentAvailable,
     priceFrom: from,
     priceTo: to,
     image: p.images[0]?.url ?? null,
     imageAlt: p.images[0]?.alt ?? p.name,
     storages: uniqueStorages(p.variants),
     colors: uniqueColors(p.variants),
+    conditions: uniqueConditions(p.variants),
     totalStock,
     inStock: totalStock > 0,
   };
@@ -228,6 +248,8 @@ function toDetail(p: ProductDetailRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    installmentAvailable: p.installmentAvailable,
+    installmentMinDownPct: p.installmentMinDownPct,
     priceFrom: from,
     priceTo: to,
     totalStock,
@@ -244,6 +266,9 @@ function toDetail(p: ProductDetailRow) {
       stock: v.stock,
       inStock: v.stock > 0,
       lowStock: v.stock > 0 && v.stock <= v.lowStockThreshold,
+      condition: v.condition,
+      batteryHealth: v.batteryHealth,
+      conditionNote: v.conditionNote,
     })),
   };
 }

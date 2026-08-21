@@ -7,6 +7,9 @@ export interface ProductColor {
   hex: string | null;
 }
 
+/** Condition of a catalog variant — JLP sells brand-new AND pre-owned units. */
+export type ProductCondition = 'NEW' | 'OPEN_BOX' | 'PREOWNED' | 'REFURBISHED';
+
 /** Card shape from GET /api/products (list). */
 export interface ProductCard {
   id: string;
@@ -22,12 +25,16 @@ export interface ProductCard {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  /** Product-level installment opt-in (terms live in config/installment). */
+  installmentAvailable: boolean;
   priceFrom: number;
   priceTo: number;
   image: string | null;
   imageAlt: string;
   storages: string[];
   colors: ProductColor[];
+  /** Distinct conditions across the active variants — usually just ["NEW"]. */
+  conditions: ProductCondition[];
   totalStock: number;
   inStock: boolean;
 }
@@ -50,6 +57,10 @@ export interface ProductVariant {
   stock: number;
   inStock: boolean;
   lowStock: boolean;
+  condition: ProductCondition;
+  /** Battery percentage — set on pre-owned/refurbished units only. */
+  batteryHealth: number | null;
+  conditionNote: string | null;
 }
 
 /** Detail shape from GET /api/products/:idOrSlug. */
@@ -69,12 +80,37 @@ export interface ProductDetail {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  installmentAvailable: boolean;
+  /** Minimum down payment as a % of the variant price (0–90). */
+  installmentMinDownPct: number;
   priceFrom: number;
   priceTo: number;
   totalStock: number;
   inStock: boolean;
   images: ProductImage[];
   variants: ProductVariant[];
+}
+
+/**
+ * A JLP branch from GET /api/branches (active only, in display order). Only the
+ * locations we actually have a street address for expose `addressLine`; the rest
+ * carry city/province only. Stock is GLOBAL — a branch is a preferred pickup /
+ * contact point, never a separate inventory.
+ */
+export interface Branch {
+  id: string;
+  name: string;
+  slug: string;
+  city: string | null;
+  province: string | null;
+  addressLine: string | null;
+  phone: string | null;
+  email: string | null;
+  hours: string | null;
+  lat: number | null;
+  lng: number | null;
+  /** Pre-selected in branch pickers. */
+  isDefault: boolean;
 }
 
 export interface Category {
@@ -104,6 +140,8 @@ export interface ProductListParams {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
+  /** Restrict to products that accept installment plans. */
+  installment?: boolean;
   inStock?: boolean;
   minPrice?: number;
   maxPrice?: number;

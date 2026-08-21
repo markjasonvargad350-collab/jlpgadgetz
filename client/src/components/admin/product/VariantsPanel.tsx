@@ -3,14 +3,16 @@ import { Pencil, Plus, SlidersHorizontal } from 'lucide-react';
 import { addVariant, updateVariant } from '../../../services/adminProducts';
 import { ApiError } from '../../../services/http';
 import { useAdminAuth } from '../../../contexts/AdminAuthContext';
-import { Field, Input } from '../ui/Field';
+import { Field, Input, Select, Textarea } from '../ui/Field';
 import { Modal } from '../ui/Modal';
 import { Spinner } from '../ui/Spinner';
 import { Badge } from '../ui/StatusBadge';
 import { AdjustStockModal } from '../AdjustStockModal';
 import type { AdjustTarget } from '../AdjustStockModal';
+import { CONDITION_LABELS, CONDITION_ORDER, isPreOwnedCondition } from '../../../config/condition';
 import { formatPHP } from '../../../utils/format';
 import type { AdminVariant, VariantCreateInput, VariantUpdateInput } from '../../../types/admin';
+import type { ProductCondition } from '../../../types/api';
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
@@ -20,6 +22,11 @@ interface VariantFormState {
   color: string;
   colorHex: string;
   price: string;
+  /** Part of the variant's uniqueness — NEW and PREOWNED "256GB · Black" coexist. */
+  condition: ProductCondition;
+  /** Blank = not recorded. Only meaningful on units that aren't sealed-new. */
+  batteryHealth: string;
+  conditionNote: string;
   initialStock: string;
   lowStockThreshold: string;
   imageUrl: string;
@@ -33,6 +40,9 @@ function toFormState(v: AdminVariant | null): VariantFormState {
     color: v?.color ?? '',
     colorHex: v?.colorHex ?? '',
     price: v ? String(v.price) : '',
+    condition: v?.condition ?? 'NEW',
+    batteryHealth: v?.batteryHealth != null ? String(v.batteryHealth) : '',
+    conditionNote: v?.conditionNote ?? '',
     initialStock: '0',
     lowStockThreshold: v ? String(v.lowStockThreshold) : '5',
     imageUrl: v?.imageUrl ?? '',
@@ -44,7 +54,8 @@ function toFormState(v: AdminVariant | null): VariantFormState {
  * Add/edit form for a single variant. On **create** the opening stock is booked
  * through the inventory ledger server-side (`initialStock`); on **edit** stock is
  * never touched here — it moves only via "Adjust stock". Mirrors the server
- * validators (SKU/storage/color required, positive price, optional 6-hex color).
+ * validators (SKU/storage/color required, positive price, optional 6-hex color,
+ * battery health 0–100, condition note ≤ 500 chars).
  */
 function VariantFormModal({
   productId,
@@ -83,6 +94,13 @@ function VariantFormModal({
     const price = Number(form.price);
     if (!Number.isFinite(price) || price <= 0) return 'Enter a price greater than zero.';
     if (form.colorHex.trim() && !HEX_RE.test(form.colorHex.trim())) return 'Color hex must look like #1a2b3c.';
+    if (form.batteryHealth.trim()) {
+      const battery = Number(form.batteryHealth);
+      if (!Number.isInteger(battery) || battery < 0 || battery > 100) {
+        return 'Battery health must be a whole number from 0 to 100.';
+      }
+    }
+    if (form.conditionNote.trim().length > 500) return 'Keep the condition note to 500 characters or fewer.';
     return null;
   }
 
@@ -97,6 +115,8 @@ function VariantFormModal({
     setSubmitting(true);
     const hex = form.colorHex.trim();
     const img = form.imageUrl.trim();
+    const battery = form.batteryHealth.trim();
+    const note = form.conditionNote.trim();
     try {
       if (isEdit) {
         const input: VariantUpdateInput = {
@@ -105,6 +125,9 @@ function VariantFormModal({
           color: form.color.trim(),
           colorHex: hex || null,
           price: Number(form.price),
+          condition: form.condition,
+          batteryHealth: battery ? Number(battery) : null,
+          conditionNote: note || null,
           lowStockThreshold: Number(form.lowStockThreshold) || 0,
           imageUrl: img || null,
           isActive: form.isActive,
@@ -117,6 +140,9 @@ function VariantFormModal({
           color: form.color.trim(),
           colorHex: hex || undefined,
           price: Number(form.price),
+          condition: form.condition,
+          batteryHealth: battery ? Number(battery) : undefined,
+          conditionNote: note || undefined,
           initialStock: Number(form.initialStock) || 0,
           lowStockThreshold: Number(form.lowStockThreshold) || 0,
           imageUrl: img || undefined,
@@ -196,6 +222,69 @@ function VariantFormModal({
           </Field>
         </div>
 
+        {/* Condition is part of the variant's identity, not just a label: the same
+            storage/color may exist twice (one brand-new, one pre-owned). Battery
+            health and the note only apply to units that aren't sealed-new, and are
+            cleared when switching back to NEW so a hidden value is never sent. */}
+        <div className="rounded-2xl bg-white/50 p-4 sm:col-span-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Condition" htmlFor="v-cond" hint="The same storage/color can exist at two conditions.">
+              <Select
+                id="v-cond"
+                value={form.condition}
+                onChange={(e) => {
+                  const condition = e.target.value as ProductCondition;
+                  patch(
+                    isPreOwnedCondition(condition)
+                      ? { condition }
+                      : { condition, batteryHealth: '', conditionNote: '' },
+                  );
+                }}
+              >
+                {CONDITION_ORDER.map((c) => (
+                  <option key={c} value={c}>
+                    {CONDITION_LABELS[c]}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+
+            {isPreOwnedCondition(form.condition) && (
+              <Field label="Battery health %" htmlFor="v-batt" hint="Optional. 0–100, from Settings › Battery Health.">
+                <Input
+                  id="v-batt"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={form.batteryHealth}
+                  onChange={(e) => patch({ batteryHealth: e.target.value })}
+                  placeholder="87"
+                />
+              </Field>
+            )}
+          </div>
+
+          {isPreOwnedCondition(form.condition) && (
+            <div className="mt-4">
+              <Field
+                label="Condition note"
+                htmlFor="v-cnote"
+                hint="Optional, shown to customers. Up to 500 characters — be honest about scratches or dents."
+              >
+                <Textarea
+                  id="v-cnote"
+                  rows={2}
+                  maxLength={500}
+                  value={form.conditionNote}
+                  onChange={(e) => patch({ conditionNote: e.target.value })}
+                  placeholder="Light scuff on the frame, screen flawless. Unit only — no box."
+                />
+              </Field>
+            </div>
+          )}
+        </div>
+
         <div className="sm:col-span-2">
           <button
             type="button"
@@ -249,7 +338,10 @@ export function VariantsPanel({
     setAdjustTarget({
       variantId: v.id,
       sku: v.sku,
-      label: `${v.storage} · ${v.color}`,
+      // Condition is in the label because two variants can share storage/color.
+      label: isPreOwnedCondition(v.condition)
+        ? `${v.storage} · ${v.color} · ${CONDITION_LABELS[v.condition]}`
+        : `${v.storage} · ${v.color}`,
       productName,
       stock: v.stock,
       lowStockThreshold: v.lowStockThreshold,
@@ -283,10 +375,14 @@ export function VariantsPanel({
                 <div className="min-w-0">
                   <p className="flex flex-wrap items-center gap-2 font-semibold text-ink">
                     <span className="truncate">{v.storage} · {v.color}</span>
+                    {isPreOwnedCondition(v.condition) && <Badge label={CONDITION_LABELS[v.condition]} tone="brand" />}
                     {!v.isActive && <Badge label="Inactive" tone="slate" />}
                     {v.lowStock && <Badge label="Low" tone="amber" dot />}
                   </p>
-                  <p className="truncate font-mono text-xs text-ink-soft">{v.sku}</p>
+                  <p className="truncate text-xs text-ink-soft">
+                    <span className="font-mono">{v.sku}</span>
+                    {v.batteryHealth != null && <> · {v.batteryHealth}% battery</>}
+                  </p>
                 </div>
               </div>
 
