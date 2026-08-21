@@ -3,7 +3,7 @@
 The database is PostgreSQL, modeled with Prisma ([`server/prisma/schema.prisma`](../server/prisma/schema.prisma)).
 A generated SQL snapshot lives in [`generated-schema.sql`](./generated-schema.sql) (for reviewers without a DB).
 
-**14 entities · 8 enums · 13 foreign keys · 38 indexes.**
+**18 entities · 12 enums · 18 foreign keys · 61 indexes.**
 
 ## Guiding principles
 
@@ -13,6 +13,10 @@ A generated SQL snapshot lives in [`generated-schema.sql`](./generated-schema.sq
 4. **Orders snapshot their line items.** `OrderItem` copies `productName`, `variantLabel`, `sku`, and `unitPrice` at purchase time, so order history is immutable even if the catalog changes later.
 5. **History outlives the catalog.** Variants with sales/inventory history can't be hard-deleted (`onDelete: Restrict`); the app archives via `isActive` / `status` instead. `OrderItem.variantId` is nullable + `SetNull` so an order survives if a variant is ever removed.
 6. **Overselling is impossible under concurrency.** Order creation + stock deduction happen inside one `prisma.$transaction` that re-reads stock and rejects if `stock < quantity` (implemented with the order service in a later phase).
+7. **Branches are locations, not warehouses.** A `Branch` is a customer-selectable shop — a preferred/pickup location and the point of contact for trade-ins and installments. The catalog and stock stay **global**: `Order.branchId`, `TradeIn.branchId`, and `InstallmentPlan.branchId` are all optional + `SetNull`, and none of them changes pricing or fulfilment. Once referenced, deactivate a branch via `isActive` instead of deleting it.
+8. **Condition is per-unit; the pre-owned badge is per-listing.** `ProductVariant.condition` (with `batteryHealth` / `conditionNote`) is the per-unit truth, and the variant uniqueness key is `(productId, storage, color, condition)` — so a NEW and a PREOWNED "256GB · Black" coexist as separate variants with separate SKUs. `Product.isPreOwned` is a separate merchandising flag (badge, homepage rail, catalog filter) and is deliberately independent of it.
+9. **Trade-in valuations are entered by staff, never derived.** The device fields on `TradeIn` are the customer's self-reported snapshot; `quotedValue` and `finalValue` are set by staff in the back-office as the request moves through `TradeInStatus`.
+10. **Installments are price ÷ months — no interest, no fees.** `InstallmentPlan.productPrice` is snapshotted at apply time and never overwritten; `principal = productPrice − downPayment` and `monthlyAmount = principal ÷ termMonths`, both computed and re-validated server-side. The `InstallmentPayment` schedule sums to exactly the principal (the last row absorbs rounding), and recording a payment updates its row — rows are never deleted.
 
 ## ER diagram
 
@@ -28,6 +32,7 @@ erDiagram
 
     ProductVariant ||--o{ OrderItem : "sold as"
     ProductVariant ||--o{ InventoryTransaction : "ledger"
+    ProductVariant ||--o{ InstallmentPlan : "financed as"
 
     Order ||--o{ OrderItem : "contains"
     Order ||--o| Payment : "paid by"
@@ -35,6 +40,12 @@ erDiagram
     Order ||--o{ InventoryTransaction : "causes"
 
     Shipment ||--o{ TrackingHistory : "logs"
+
+    Branch ||--o{ Order : "preferred branch"
+    Branch ||--o{ TradeIn : "drop-off point"
+    Branch ||--o{ InstallmentPlan : "handled at"
+
+    InstallmentPlan ||--o{ InstallmentPayment : "schedules"
 
     Role {
         string id PK
@@ -54,6 +65,8 @@ erDiagram
         string id PK
         string slug UK
         string name
+        string description
+        string imageUrl
         int position
         boolean isActive
     }
@@ -72,7 +85,10 @@ erDiagram
         boolean isNewArrival
         boolean isBestSeller
         boolean isDeal
+        boolean isPreOwned
         int releaseYear
+        boolean installmentAvailable
+        int installmentMinDownPct
         string categoryId FK
     }
     ProductImage {
@@ -93,7 +109,11 @@ erDiagram
         int reservedStock
         int soldQty
         int lowStockThreshold
+        string imageUrl
         boolean isActive
+        enum condition
+        int batteryHealth
+        string conditionNote
         string productId FK
     }
     Order {
@@ -107,6 +127,7 @@ erDiagram
         string city
         string province
         string postalCode
+        string addressNote
         decimal subtotal
         decimal deliveryFee
         decimal discount
@@ -114,6 +135,7 @@ erDiagram
         enum paymentMethod
         enum paymentStatus
         enum status
+        string branchId FK "nullable"
     }
     OrderItem {
         string id PK
@@ -189,7 +211,81 @@ erDiagram
         json meta
         string ip
     }
+    Branch {
+        string id PK
+        string slug UK
+        string name
+        string city
+        string province
+        string addressLine
+        string phone
+        string email
+        string hours
+        float lat
+        float lng
+        int position
+        boolean isActive
+        boolean isDefault
+    }
+    TradeIn {
+        string id PK
+        string reference UK
+        string customerName
+        string customerEmail
+        string customerPhone
+        string deviceBrand
+        string deviceModel
+        string storage
+        string color
+        enum condition
+        int batteryHealth
+        string imei
+        boolean hasBox
+        boolean hasCharger
+        string issues
+        string_arr photos
+        string branchId FK "nullable"
+        enum status
+        decimal quotedValue
+        decimal finalValue
+        string staffNotes
+        string reviewedByAdminId "no FK"
+    }
+    InstallmentPlan {
+        string id PK
+        string reference UK
+        string customerName
+        string customerEmail
+        string customerPhone
+        string productName
+        string variantLabel
+        decimal productPrice
+        string variantId FK "nullable"
+        string branchId FK "nullable"
+        int termMonths
+        decimal downPayment
+        decimal principal
+        decimal monthlyAmount
+        enum status
+        string staffNotes
+        string approvedByAdminId "no FK"
+    }
+    InstallmentPayment {
+        string id PK
+        string planId FK
+        int sequence
+        datetime dueDate
+        decimal amountDue
+        decimal amountPaid
+        enum status
+        datetime paidAt
+        enum method
+        string reference
+        string recordedByAdminId "no FK"
+    }
 ```
+
+*Every model also carries `createdAt` (and `updatedAt` where its rows are mutable); those are left out above except where the timestamp is the point of the row.*
 
 ## Enums
 
@@ -203,6 +299,12 @@ erDiagram
 | `InventoryTxnType` | RESTOCK · SALE · RETURN · ADJUSTMENT · CANCELLATION |
 | `NotificationType` | NEW_ORDER · LOW_STOCK · OUT_OF_STOCK · PAYMENT · SYSTEM |
 | `NotificationLevel` | INFO · SUCCESS · WARNING · ERROR |
+| `ProductCondition` | NEW · OPEN_BOX · PREOWNED · REFURBISHED |
+| `TradeInStatus` | SUBMITTED · REVIEWING · QUOTED · ACCEPTED · DECLINED · COMPLETED · CANCELLED |
+| `InstallmentStatus` | PENDING · APPROVED · ACTIVE · COMPLETED · REJECTED · CANCELLED |
+| `InstallmentPaymentStatus` | PENDING · PAID |
+
+`ProductCondition` is shared: it defaults to `NEW` on `ProductVariant` (the catalog) and to `PREOWNED` on `TradeIn` (a device being traded in). `InstallmentPayment.method` reuses `PaymentMethod`.
 
 ## Referential actions (deletes)
 
@@ -219,6 +321,21 @@ erDiagram
 | `TrackingHistory.shipment` → Shipment | Cascade | Events belong to the shipment. |
 | `InventoryTransaction.order` → Order | SetNull | Keep the ledger even if an order is purged. |
 | `InventoryTransaction.admin` / `AuditLog.admin` → User | SetNull | Keep the audit trail even if an admin is removed. |
+| `Order.branch` / `TradeIn.branch` / `InstallmentPlan.branch` → Branch | SetNull | A branch is a preference, not a dependency — the order/request survives it (deactivate via `isActive` rather than deleting). |
+| `InstallmentPlan.variant` → ProductVariant | SetNull | The plan keeps its own `productName` / `variantLabel` / `productPrice` snapshot, so it survives catalog changes. |
+| `InstallmentPayment.plan` → InstallmentPlan | Cascade | The schedule belongs to the plan. |
+
+`TradeIn.reviewedByAdminId`, `InstallmentPlan.approvedByAdminId`, and `InstallmentPayment.recordedByAdminId` are **loose references with no foreign key** — same pattern as `Notification.entityId`. Staff attribution is informational and must never block deleting a `User`.
+
+## Buy / Sell / Trade (JLP Gadgetz Center)
+
+| Flow | Models | Who drives it |
+|------|--------|---------------|
+| **Buy** — new *and* pre-owned units | `Product` (`isPreOwned`) · `ProductVariant` (`condition`, `batteryHealth`, `conditionNote`) | The owner adds products in the admin; customers check out as guests. |
+| **Sell / Trade** — trade a device in | `TradeIn` (+ optional `Branch`) | The customer submits online; **staff** review and set `quotedValue` / `finalValue`. |
+| **Installments** — pay over 3/6/9/12 months | `InstallmentPlan` → `InstallmentPayment` (+ optional `Branch`, optional `ProductVariant`) | The customer applies online; **staff** approve and record each payment. |
+
+The available terms (3/6/9/12 months) live in shared config, not the database. Branch selection is a **picker only** — every branch shares one global catalog and one global stock pool. Both `TradeIn` and `InstallmentPlan` carry human-facing references (`TRD-YYYYMMDD-####`, `INS-YYYYMMDD-####`) in the same shape as `Order.orderNumber`, and neither has a customer account behind it: the name/email/phone are captured inline, exactly as on `Order`.
 
 ## Simulated delivery (not real GPS)
 
