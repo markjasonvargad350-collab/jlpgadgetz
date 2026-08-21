@@ -125,7 +125,7 @@ export function CatalogPage() {
             : featured
               ? 'Featured'
               : preOwned
-                ? 'Pre-loved'
+                ? 'Pre-owned'
                 : 'All products';
 
   useDocumentTitle(title);
@@ -220,7 +220,7 @@ export function CatalogPage() {
             onChange={(e) => updateParams({ preOwned: e.target.checked ? 'true' : null, page: null })}
             className="accent-brand-600"
           />
-          Pre-loved only
+          Pre-owned only
         </label>
 
         <div className="flex items-center gap-2 rounded-full glass px-3 py-1.5 text-sm focus-within:ring-2 focus-within:ring-brand-400">

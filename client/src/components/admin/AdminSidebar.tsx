@@ -38,7 +38,7 @@ export function AdminSidebar({ onNavigate }: { onNavigate?: () => void }) {
           alt="JLP Gadgetz Center logo"
           width={36}
           height={36}
-          className="h-9 w-9 shrink-0 rounded-full object-contain"
+          className="h-9 w-9 shrink-0 rounded-full object-contain ring-1 ring-brand-100"
         />
         <span className="font-display text-lg font-bold">
           JLP

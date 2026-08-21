@@ -52,7 +52,7 @@ const FLAGS: { key: keyof ProductFieldsValue; label: string }[] = [
   { key: 'isNewArrival', label: 'New arrival' },
   { key: 'isBestSeller', label: 'Best seller' },
   { key: 'isDeal', label: 'On deal' },
-  { key: 'isPreOwned', label: 'Pre-loved / pre-owned' },
+  { key: 'isPreOwned', label: 'Pre-owned' },
 ];
 
 /** The core product attributes form (shared by create + edit). */
@@ -148,9 +148,9 @@ export function ProductFields({
           })}
         </div>
         <p className="mt-2 text-xs text-ink-soft">
-          “Pre-loved / pre-owned” marks the whole listing as second-hand — it shows a badge on the storefront and puts
-          the product in the Pre-loved section. The condition of each individual unit (brand new, open box, pre-owned,
-          refurbished) is still set per variant below.
+          “Pre-owned” marks the whole listing as second-hand — it shows a badge on the storefront and puts the product
+          in the Pre-owned section. The condition of each individual unit (brand new, open box, pre-owned, refurbished)
+          is still set per variant below.
         </p>
       </div>
 

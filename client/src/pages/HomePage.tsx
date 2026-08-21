@@ -43,7 +43,7 @@ export function HomePage() {
       <CatalogSection title="Best sellers" subtitle="What everyone’s buying right now." params={{ bestSeller: true }} />
       <CatalogSection title="New arrivals" subtitle="The latest to land in store." params={{ newArrival: true }} />
       <CatalogSection title="Today’s deals" subtitle="Limited-time savings." params={{ deal: true }} hideWhenEmpty />
-      <CatalogSection title="Pre-loved" subtitle="Genuine second-hand units, checked before they hit the shelf." params={{ preOwned: true }} hideWhenEmpty />
+      <CatalogSection title="Pre-owned" subtitle="Genuine second-hand units, checked before they hit the shelf." params={{ preOwned: true }} hideWhenEmpty />
       <WhyUs />
       <Reviews />
       <Faq />
@@ -55,40 +55,56 @@ export function HomePage() {
 
 function Hero() {
   return (
-    <section className={`${WIDTH} flex flex-col items-center gap-8 pt-14 text-center sm:pt-20`}>
-      <motion.span
+    <section
+      className={`${WIDTH} relative isolate flex flex-col items-center pt-14 text-center sm:pt-20`}
+    >
+      {/* Decorative warm glow behind the headline. */}
+      <div
+        aria-hidden="true"
+        className="hero-glow pointer-events-none absolute -top-28 left-1/2 -z-10 h-[34rem] w-[min(100%+6rem,60rem)] -translate-x-1/2 blur-2xl"
+      />
+
+      <motion.p
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="rounded-full glass px-4 py-1.5 text-xs font-semibold tracking-widest text-brand-700 uppercase"
+        className="font-sans text-sm font-medium italic tracking-[0.16em] text-brand-700 sm:text-base"
       >
-        <Sparkles size={13} className="mr-1.5 inline" /> Premium iPhones · Guest checkout
-      </motion.span>
+        Driven by quality. Defined by class.
+      </motion.p>
 
       <motion.h1
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.05 }}
-        className="max-w-3xl text-5xl leading-[1.05] font-extrabold sm:text-7xl"
+        transition={{ duration: 0.6, delay: 0.06 }}
+        className="mt-5 max-w-4xl text-5xl leading-[1.02] font-extrabold sm:text-7xl lg:text-8xl"
       >
-        Discover Your Next <span className="text-gradient">iPhone</span>
+        Own the <span className="text-gradient">moment.</span>
       </motion.h1>
 
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.12 }}
-        className="max-w-xl text-lg text-ink-soft"
+        className="mt-3 font-display text-2xl font-bold text-ink sm:mt-4 sm:text-4xl lg:text-5xl"
       >
-        A premium, glassy iPhone store with guest checkout, genuine warranties, and nationwide
-        delivery. No account needed — shop in minutes.
+        Experience the <span className="text-brand-600">iPhone</span>—
+      </motion.p>
+
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.18 }}
+        className="mt-5 max-w-xl text-base text-ink-soft sm:text-lg"
+      >
+        Available now at <strong className="font-bold text-ink">JLP Gadgetz Center</strong>!
       </motion.p>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.18 }}
-        className="flex flex-wrap items-center justify-center gap-3"
+        transition={{ duration: 0.6, delay: 0.24 }}
+        className="mt-8 flex flex-wrap items-center justify-center gap-3"
       >
         <Link
           to="/shop?category=iphone"

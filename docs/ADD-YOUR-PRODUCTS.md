@@ -110,7 +110,7 @@ Sidebar → **Products** → **New product** (top right).
 | **Release year** | `2021` | Optional |
 | **Description** | A few honest sentences | Required |
 | **Highlights** | One bullet per line | e.g. `A15 Bionic chip` |
-| **Flags** | Featured / New arrival / Best seller / On deal / Pre-loved | Controls where it appears on the homepage. Leave *Pre-loved* off for brand-new stock |
+| **Flags** | Featured / New arrival / Best seller / On deal / Pre-owned | Controls where it appears on the homepage. Leave *Pre-owned* off for brand-new stock |
 | **Installment** | See [§5](#5-turn-on-installments-for-a-product) | |
 
 Press **Create product**. You're taken straight into the edit screen, where
@@ -154,15 +154,15 @@ There are **two separate switches**, and they do different jobs:
 
 | | Where | What it does |
 |---|---|---|
-| **“Pre-loved / pre-owned” flag** | Product → **Details** → Flags | Labels the **whole listing** second-hand: a *Pre-loved* badge on the card and product page, a place in the homepage **Pre-loved** row, and inclusion in the store's *Pre-loved only* filter |
+| **“Pre-owned” flag** | Product → **Details** → Flags | Labels the **whole listing** second-hand: a *Pre-owned* badge on the card and product page, a place in the homepage **Pre-owned** row, and inclusion in the store's *Pre-owned only* filter |
 | **Condition box** | Product → **Variants** → each variant | The truth about **one specific unit**: Brand new / Open box / Refurbished / Pre-owned, plus battery health and a condition note |
 
 Rule of thumb:
 
 - Listing sells **only** second-hand units (e.g. `iPhone 11 (Pre-owned)`) → tick
-  the **Pre-loved** flag *and* set each variant's condition.
+  the **Pre-owned** flag *and* set each variant's condition.
 - Listing sells brand-new *and* second-hand units on the same page → leave the
-  **Pre-loved** flag **off** and let the per-variant condition speak. Ticking it
+  **Pre-owned** flag **off** and let the per-variant condition speak. Ticking it
   would label the brand-new units second-hand too.
 
 ### The variant's Condition box
@@ -367,7 +367,7 @@ Setting the shop up for the first time:
 - [ ] **Products** — add each real phone: Details → Create → Images → Variants
 - [ ] Every variant has SKU, price, storage, color, **condition** and opening stock
 - [ ] Pre-owned units have battery health + an honest condition note
-- [ ] Second-hand-only listings have the **Pre-loved** flag ticked in Details
+- [ ] Second-hand-only listings have the **Pre-owned** flag ticked in Details
 - [ ] Installment toggle on for the phones you'll offer monthly
 - [ ] Product **Status = Active** for everything ready to sell
 - [ ] Archive the 15 sample products

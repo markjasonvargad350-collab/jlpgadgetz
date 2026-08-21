@@ -193,10 +193,10 @@ model Product {
   isNewArrival Boolean       @default(false)
   isBestSeller Boolean       @default(false)
   isDeal       Boolean       @default(false)
-  // Listing-level "Pre-loved" merchandising flag (badge + homepage rail +
+  // Listing-level "Pre-owned" merchandising flag (badge + homepage rail +
   // catalog filter). Deliberately independent of ProductVariant.condition,
   // which stays the per-unit truth: the owner may want a whole listing shown as
-  // pre-loved before its variants exist, or a mixed listing to stay untagged.
+  // pre-owned before its variants exist, or a mixed listing to stay untagged.
   isPreOwned   Boolean       @default(false)
   releaseYear  Int?
 

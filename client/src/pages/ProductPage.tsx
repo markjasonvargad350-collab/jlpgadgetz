@@ -235,7 +235,7 @@ export function ProductPage() {
             {product.isBestSeller && <Tag>Best Seller</Tag>}
             {product.isNewArrival && <Tag>New</Tag>}
             {product.discountPct > 0 && <Tag tone="deal">-{product.discountPct}%</Tag>}
-            {product.isPreOwned && <Tag tone="condition">Pre-loved</Tag>}
+            {product.isPreOwned && <Tag tone="condition">Pre-owned</Tag>}
           </div>
 
           <h1 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl">{product.name}</h1>
@@ -501,7 +501,7 @@ function Tag({
   const tones: Record<'brand' | 'deal' | 'condition', string> = {
     brand: 'brand-gradient text-white',
     deal: 'bg-coral text-white',
-    // Neutral — a pre-loved tag is information, not a promotion.
+    // Neutral — a pre-owned tag is information, not a promotion.
     condition: 'bg-ink/75 text-white',
   };
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${tones[tone]}`}>{children}</span>;

@@ -11,7 +11,7 @@ export interface ProductQuery {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
-  /** Only listings flagged pre-loved / second-hand at the product level. */
+  /** Only listings flagged pre-owned / second-hand at the product level. */
   preOwned?: boolean;
   /** Only products the owner has opted into installment plans. */
   installment?: boolean;

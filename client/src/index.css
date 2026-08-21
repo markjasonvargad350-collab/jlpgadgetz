@@ -74,6 +74,15 @@
     radial-gradient(46rem 46rem at 50% 108%, rgba(255, 122, 24, 0.20), transparent 60%);
 }
 
+/* Soft orange glow for the homepage hero. Sits behind the headline as a
+   decorative layer — always pair with aria-hidden + pointer-events-none. */
+@utility hero-glow {
+  background-image:
+    radial-gradient(48% 44% at 50% 34%, rgba(255, 122, 24, 0.30), transparent 70%),
+    radial-gradient(36% 36% at 20% 20%, rgba(255, 165, 59, 0.26), transparent 70%),
+    radial-gradient(36% 36% at 82% 26%, rgba(255, 107, 74, 0.22), transparent 70%);
+}
+
 /* Signature brand gradient (CTAs / brand marks) */
 @utility brand-gradient {
   background-image: linear-gradient(135deg, #ffb25a 0%, #ff7a18 48%, #f4590a 100%);

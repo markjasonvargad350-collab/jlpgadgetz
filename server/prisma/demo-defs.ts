@@ -36,7 +36,7 @@ export type ProductDef = {
   /**
    * Applied to every variant this def generates. Used for second-hand listings:
    * the condition/battery/note here is the per-UNIT truth, while the listing-level
-   * `flags.isPreOwned` is what drives the storefront badge and Pre-loved rail.
+   * `flags.isPreOwned` is what drives the storefront badge and Pre-owned rail.
    */
   unit?: { condition: ProductCondition; batteryHealth?: number; conditionNote?: string };
   flags?: Partial<{
@@ -95,12 +95,12 @@ export const INSTALLMENT_MIN_DOWN_PCT: Record<string, number> = {
   'iphone-12-pre-loved': 20,
 };
 
-// ── Pre-loved demo listing ──────────────────────────────────────────────────
+// ── Pre-owned demo listing ──────────────────────────────────────────────────
 //
-// Demonstrates both new features at once: the listing-level "Pre-loved" flag and
+// Demonstrates both new features at once: the listing-level "Pre-owned" flag and
 // the installment application. Every unit detail is DEMO data.
 export const PRE_LOVED_DEMO: ProductDef = {
-  name: 'iPhone 12 (Pre-loved)',
+  name: 'iPhone 12 (Pre-owned)',
   slug: 'iphone-12-pre-loved',
   model: 'iPhone 12',
   categorySlug: 'iphone',
@@ -133,7 +133,7 @@ export const PRE_LOVED_DEMO: ProductDef = {
   flags: { isPreOwned: true },
 };
 
-/** On-hand units per pre-loved SKU — second-hand stock is one-off, never 25. */
+/** On-hand units per pre-owned SKU — second-hand stock is one-off, never 25. */
 export const PRE_LOVED_STOCK: Record<string, number> = {
   'IP12PL-64-BLK': 1,
   'IP12PL-64-BLU': 2,

@@ -25,7 +25,7 @@ export interface ProductCard {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
-  /** Listing-level "Pre-loved" flag — separate from per-variant `conditions`. */
+  /** Listing-level "Pre-owned" flag — separate from per-variant `conditions`. */
   isPreOwned: boolean;
   /** Product-level installment opt-in (terms live in config/installment). */
   installmentAvailable: boolean;
@@ -143,7 +143,7 @@ export interface ProductListParams {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
-  /** Restrict to listings flagged pre-loved. */
+  /** Restrict to listings flagged pre-owned. */
   preOwned?: boolean;
   /** Restrict to products that accept installment plans. */
   installment?: boolean;

@@ -60,7 +60,7 @@ export function AboutPage() {
             alt={BUSINESS.name}
             width={112}
             height={112}
-            className="h-24 w-24 shrink-0 rounded-full object-contain sm:h-28 sm:w-28"
+            className="h-24 w-24 shrink-0 rounded-full object-contain ring-1 ring-brand-100 sm:h-28 sm:w-28"
           />
           <div>
             <p className="text-xs font-semibold tracking-[0.18em] text-brand-700 uppercase">

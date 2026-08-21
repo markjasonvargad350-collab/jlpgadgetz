@@ -10,7 +10,7 @@
 //  What it does — all definitions come from ./demo-defs, shared with the seed:
 //    1. Branches      — creates any of the 3 JLP branches that don't exist yet.
 //    2. Installments  — turns the opt-in ON for the products in the shared table.
-//    3. Pre-loved     — adds the "iPhone 12 (Pre-loved)" listing + its variants.
+//    3. Pre-owned     — adds the "iPhone 12 (Pre-owned)" listing + its variants.
 //    4. Applications  — adds the demo trade-in / installment applications.
 //
 //  What it will NEVER do:
@@ -120,7 +120,7 @@ async function main() {
   // images, and variants are never touched.
   let installmentEnabled = 0;
   for (const [slug, minDownPct] of Object.entries(INSTALLMENT_MIN_DOWN_PCT)) {
-    // The pre-loved demo listing is step 3's job — it's created with these same
+    // The pre-owned demo listing is step 3's job — it's created with these same
     // flags already set, so don't report it as a missing product here.
     if (slug === PRE_LOVED_DEMO.slug) continue;
     const product = await prisma.product.findUnique({
@@ -143,7 +143,7 @@ async function main() {
     console.log(`   ✓ Installments enabled: ${product.name} (min down ${minDownPct}%)`);
   }
 
-  // --- 3. Pre-loved demo listing -------------------------------------------
+  // --- 3. Pre-owned demo listing -------------------------------------------
   const def = PRE_LOVED_DEMO;
   let product = await prisma.product.findUnique({
     where: { slug: def.slug },
@@ -161,7 +161,7 @@ async function main() {
         where: { id: product.id },
         data: { isPreOwned: true, installmentAvailable: true, installmentMinDownPct: minDownPct },
       });
-      console.log(`   ✓ ${product.name} already existed — flags refreshed (Pre-loved + installments)`);
+      console.log(`   ✓ ${product.name} already existed — flags refreshed (Pre-owned + installments)`);
     } else {
       console.log(`   • ${product.name} already exists — left untouched`);
     }
@@ -380,7 +380,7 @@ async function main() {
   console.log('\n✅ Demo data added.');
   console.log(
     `   Branches created: ${branchesCreated} · installment opt-ins set: ${installmentEnabled} · ` +
-      `pre-loved variants created: ${variantsCreated} · trade-ins: ${tradeInsCreated} · plans: ${plansCreated}`,
+      `pre-owned variants created: ${variantsCreated} · trade-ins: ${tradeInsCreated} · plans: ${plansCreated}`,
   );
   console.log('   Nothing was deleted, no prices changed, no stock adjusted.\n');
 }

@@ -42,14 +42,15 @@ export function StoreNav() {
   return (
     <header className="sticky top-0 z-30 mx-auto mt-4 w-[min(100%-1.5rem,76rem)]">
       <div className="flex items-center gap-3 rounded-full glass px-4 py-2.5 sm:gap-5 sm:px-5">
-        {/* brand */}
-        <Link to="/" className="flex shrink-0 items-center gap-2 font-display text-lg font-bold">
+        {/* brand — the logo art is a circular badge on an opaque white square, so
+            it's clipped to a circle and ringed to read as a deliberate mark. */}
+        <Link to="/" className="flex shrink-0 items-center gap-2.5 font-display text-base font-bold sm:text-lg">
           <img
             src="/brand-logo.png"
             alt="JLP Gadgetz Center logo"
-            width={32}
-            height={32}
-            className="h-8 w-8 shrink-0 rounded-full object-contain"
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 rounded-full object-contain ring-1 ring-brand-100"
           />
           <span className="hidden sm:inline">JLP Gadgetz Center</span>
         </Link>

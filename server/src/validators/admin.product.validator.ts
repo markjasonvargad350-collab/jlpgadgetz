@@ -42,7 +42,7 @@ export const createProductSchema = z.object({
   isNewArrival: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
   isDeal: z.boolean().optional(),
-  // Listing-level "Pre-loved" flag — merchandising only; per-unit state lives on
+  // Listing-level "Pre-owned" flag — merchandising only; per-unit state lives on
   // each variant's `condition`.
   isPreOwned: z.boolean().optional(),
   releaseYear: z.number().int().min(2000).max(2100).optional(),

@@ -119,7 +119,7 @@ export interface AdminProductDetail {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
-  /** Listing-level "Pre-loved" flag; per-unit state is each variant's condition. */
+  /** Listing-level "Pre-owned" flag; per-unit state is each variant's condition. */
   isPreOwned: boolean;
   releaseYear: number | null;
   categoryId: string;

@@ -36,7 +36,7 @@ export function StoreFooter() {
                 alt="JLP Gadgetz Center logo"
                 width={40}
                 height={40}
-                className="h-10 w-10 shrink-0 rounded-full object-contain"
+                className="h-10 w-10 shrink-0 rounded-full object-contain ring-1 ring-brand-100"
               />
               {BUSINESS.name}
             </div>
