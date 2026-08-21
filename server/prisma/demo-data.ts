@@ -120,6 +120,9 @@ async function main() {
   // images, and variants are never touched.
   let installmentEnabled = 0;
   for (const [slug, minDownPct] of Object.entries(INSTALLMENT_MIN_DOWN_PCT)) {
+    // The pre-loved demo listing is step 3's job — it's created with these same
+    // flags already set, so don't report it as a missing product here.
+    if (slug === PRE_LOVED_DEMO.slug) continue;
     const product = await prisma.product.findUnique({
       where: { slug },
       select: { id: true, name: true, installmentAvailable: true, installmentMinDownPct: true },
