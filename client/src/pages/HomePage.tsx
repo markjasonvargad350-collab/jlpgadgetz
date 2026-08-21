@@ -43,6 +43,7 @@ export function HomePage() {
       <CatalogSection title="Best sellers" subtitle="What everyone’s buying right now." params={{ bestSeller: true }} />
       <CatalogSection title="New arrivals" subtitle="The latest to land in store." params={{ newArrival: true }} />
       <CatalogSection title="Today’s deals" subtitle="Limited-time savings." params={{ deal: true }} hideWhenEmpty />
+      <CatalogSection title="Pre-loved" subtitle="Genuine second-hand units, checked before they hit the shelf." params={{ preOwned: true }} hideWhenEmpty />
       <WhyUs />
       <Reviews />
       <Faq />
@@ -204,6 +205,7 @@ function CatalogSection({
   if (params.bestSeller) linkParams.set('bestSeller', 'true');
   if (params.newArrival) linkParams.set('newArrival', 'true');
   if (params.deal) linkParams.set('deal', 'true');
+  if (params.preOwned) linkParams.set('preOwned', 'true');
   const seeAll = `/shop${linkParams.toString() ? `?${linkParams}` : ''}`;
 
   return (

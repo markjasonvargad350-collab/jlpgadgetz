@@ -193,6 +193,11 @@ model Product {
   isNewArrival Boolean       @default(false)
   isBestSeller Boolean       @default(false)
   isDeal       Boolean       @default(false)
+  // Listing-level "Pre-loved" merchandising flag (badge + homepage rail +
+  // catalog filter). Deliberately independent of ProductVariant.condition,
+  // which stays the per-unit truth: the owner may want a whole listing shown as
+  // pre-loved before its variants exist, or a mixed listing to stay untagged.
+  isPreOwned   Boolean       @default(false)
   releaseYear  Int?
 
   // Installment eligibility (per-product opt-in). Terms (3/6/9/12) live in a
@@ -216,6 +221,7 @@ model Product {
   @@index([isBestSeller])
   @@index([isNewArrival])
   @@index([isDeal])
+  @@index([isPreOwned])
   // Catalog hot paths: the public list always filters status=ACTIVE and, by
   // default, orders by createdAt; the other composites back the sortable
   // columns (price / name / release year).

@@ -34,6 +34,7 @@ export function CatalogPage() {
   const bestSeller = searchParams.get('bestSeller') === 'true';
   const newArrival = searchParams.get('newArrival') === 'true';
   const featured = searchParams.get('featured') === 'true';
+  const preOwned = searchParams.get('preOwned') === 'true';
   const minPrice = searchParams.get('minPrice') ?? '';
   const maxPrice = searchParams.get('maxPrice') ?? '';
 
@@ -72,6 +73,7 @@ export function CatalogPage() {
     bestSeller: bestSeller || undefined,
     newArrival: newArrival || undefined,
     featured: featured || undefined,
+    preOwned: preOwned || undefined,
     minPrice: minPrice ? Number(minPrice) : undefined,
     maxPrice: maxPrice ? Number(maxPrice) : undefined,
   };
@@ -98,7 +100,16 @@ export function CatalogPage() {
 
   const activeCategory = categories.find((c) => c.slug === category);
   const hasFilters = Boolean(
-    category || urlQ || inStockOnly || deal || bestSeller || newArrival || featured || minPrice || maxPrice,
+    category ||
+      urlQ ||
+      inStockOnly ||
+      deal ||
+      bestSeller ||
+      newArrival ||
+      featured ||
+      preOwned ||
+      minPrice ||
+      maxPrice,
   );
 
   const title = urlQ
@@ -113,7 +124,9 @@ export function CatalogPage() {
             ? 'New arrivals'
             : featured
               ? 'Featured'
-              : 'All products';
+              : preOwned
+                ? 'Pre-loved'
+                : 'All products';
 
   useDocumentTitle(title);
 
@@ -198,6 +211,16 @@ export function CatalogPage() {
             className="accent-brand-600"
           />
           In stock only
+        </label>
+
+        <label className="flex cursor-pointer items-center gap-2 rounded-full glass px-4 py-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={preOwned}
+            onChange={(e) => updateParams({ preOwned: e.target.checked ? 'true' : null, page: null })}
+            className="accent-brand-600"
+          />
+          Pre-loved only
         </label>
 
         <div className="flex items-center gap-2 rounded-full glass px-3 py-1.5 text-sm focus-within:ring-2 focus-within:ring-brand-400">

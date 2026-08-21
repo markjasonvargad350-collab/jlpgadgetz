@@ -235,6 +235,7 @@ export function ProductPage() {
             {product.isBestSeller && <Tag>Best Seller</Tag>}
             {product.isNewArrival && <Tag>New</Tag>}
             {product.discountPct > 0 && <Tag tone="deal">-{product.discountPct}%</Tag>}
+            {product.isPreOwned && <Tag tone="condition">Pre-loved</Tag>}
           </div>
 
           <h1 className="mt-2 font-display text-3xl font-extrabold sm:text-4xl">{product.name}</h1>
@@ -490,18 +491,20 @@ function uniqueConditions(variants: ProductVariant[]): ProductCondition[] {
   return sortConditions([...new Set(variants.map((v) => v.condition))]);
 }
 
-function Tag({ children, tone = 'brand' }: { children: React.ReactNode; tone?: 'brand' | 'deal' }) {
-  return (
-    <span
-      className={
-        tone === 'deal'
-          ? 'rounded-full bg-coral px-2.5 py-0.5 text-xs font-bold text-white'
-          : 'rounded-full brand-gradient px-2.5 py-0.5 text-xs font-bold text-white'
-      }
-    >
-      {children}
-    </span>
-  );
+function Tag({
+  children,
+  tone = 'brand',
+}: {
+  children: React.ReactNode;
+  tone?: 'brand' | 'deal' | 'condition';
+}) {
+  const tones: Record<'brand' | 'deal' | 'condition', string> = {
+    brand: 'brand-gradient text-white',
+    deal: 'bg-coral text-white',
+    // Neutral — a pre-loved tag is information, not a promotion.
+    condition: 'bg-ink/75 text-white',
+  };
+  return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${tones[tone]}`}>{children}</span>;
 }
 
 function ProductSkeleton() {

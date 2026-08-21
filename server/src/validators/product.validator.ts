@@ -10,6 +10,8 @@ export const productQuerySchema = z.object({
   bestSeller: boolParam.optional(),
   newArrival: boolParam.optional(),
   deal: boolParam.optional(),
+  /** Only listings the owner flagged as pre-loved / second-hand. */
+  preOwned: boolParam.optional(),
   installment: boolParam.optional(),
   inStock: boolParam.optional(),
   minPrice: z.coerce.number().nonnegative().optional(),

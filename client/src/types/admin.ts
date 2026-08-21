@@ -94,6 +94,7 @@ export interface AdminProductCard {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  isPreOwned: boolean;
   releaseYear: number | null;
   image: string | null;
   variantCount: number;
@@ -118,6 +119,8 @@ export interface AdminProductDetail {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  /** Listing-level "Pre-loved" flag; per-unit state is each variant's condition. */
+  isPreOwned: boolean;
   releaseYear: number | null;
   categoryId: string;
   categorySlug: string;
@@ -431,6 +434,7 @@ export interface ProductCreateInput {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isDeal?: boolean;
+  isPreOwned?: boolean;
   releaseYear?: number;
   categoryId: string;
   installmentAvailable?: boolean;
@@ -453,6 +457,7 @@ export interface ProductUpdateInput {
   isNewArrival?: boolean;
   isBestSeller?: boolean;
   isDeal?: boolean;
+  isPreOwned?: boolean;
   releaseYear?: number | null;
   categoryId?: string;
   installmentAvailable?: boolean;

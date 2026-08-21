@@ -91,6 +91,7 @@ function toAdminDetail(p: AdminDetailRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    isPreOwned: p.isPreOwned,
     releaseYear: p.releaseYear,
     categoryId: p.categoryId,
     categorySlug: p.category.slug,
@@ -118,6 +119,7 @@ function toAdminCard(p: AdminListRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    isPreOwned: p.isPreOwned,
     releaseYear: p.releaseYear,
     image: p.images[0]?.url ?? null,
     variantCount: p._count.variants,
@@ -219,6 +221,7 @@ export async function createProduct(input: CreateProductInput, adminId?: string)
         isNewArrival: input.isNewArrival ?? false,
         isBestSeller: input.isBestSeller ?? false,
         isDeal: input.isDeal ?? false,
+        isPreOwned: input.isPreOwned ?? false,
         releaseYear: input.releaseYear,
         categoryId: input.categoryId,
         images: input.images?.length
@@ -294,6 +297,7 @@ export async function updateProduct(id: string, input: UpdateProductInput, admin
   if (input.isNewArrival !== undefined) data.isNewArrival = input.isNewArrival;
   if (input.isBestSeller !== undefined) data.isBestSeller = input.isBestSeller;
   if (input.isDeal !== undefined) data.isDeal = input.isDeal;
+  if (input.isPreOwned !== undefined) data.isPreOwned = input.isPreOwned;
   if (input.releaseYear !== undefined) data.releaseYear = input.releaseYear;
   if (input.categoryId !== undefined) data.categoryId = input.categoryId;
 

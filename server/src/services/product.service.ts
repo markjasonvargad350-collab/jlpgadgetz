@@ -11,6 +11,8 @@ export interface ProductQuery {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
+  /** Only listings flagged pre-loved / second-hand at the product level. */
+  preOwned?: boolean;
   /** Only products the owner has opted into installment plans. */
   installment?: boolean;
   inStock?: boolean;
@@ -42,6 +44,7 @@ const cardSelect = {
   isNewArrival: true,
   isBestSeller: true,
   isDeal: true,
+  isPreOwned: true,
   installmentAvailable: true,
   category: { select: { slug: true, name: true } },
   images: { select: { url: true, alt: true }, orderBy: { position: 'asc' }, take: 1 },
@@ -67,6 +70,7 @@ const detailSelect = {
   isNewArrival: true,
   isBestSeller: true,
   isDeal: true,
+  isPreOwned: true,
   installmentAvailable: true,
   installmentMinDownPct: true,
   category: { select: { slug: true, name: true } },
@@ -107,6 +111,7 @@ function buildWhere(query: ProductQuery): Prisma.ProductWhereInput {
   if (query.bestSeller) where.isBestSeller = true;
   if (query.newArrival) where.isNewArrival = true;
   if (query.deal) where.isDeal = true;
+  if (query.preOwned) where.isPreOwned = true;
   if (query.installment) where.installmentAvailable = true;
 
   if (query.q) {
@@ -216,6 +221,7 @@ function toCard(p: ProductCardRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    isPreOwned: p.isPreOwned,
     installmentAvailable: p.installmentAvailable,
     priceFrom: from,
     priceTo: to,
@@ -248,6 +254,7 @@ function toDetail(p: ProductDetailRow) {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    isPreOwned: p.isPreOwned,
     installmentAvailable: p.installmentAvailable,
     installmentMinDownPct: p.installmentMinDownPct,
     priceFrom: from,

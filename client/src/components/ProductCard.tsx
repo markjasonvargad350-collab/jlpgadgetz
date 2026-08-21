@@ -11,8 +11,12 @@ import { CONDITION_LABELS, sortConditions } from '../config/condition';
  */
 export function ProductCard({ product }: { product: ProductCardType }) {
   const hasDiscount = product.discountPct > 0;
-  // Only worth calling out when the product isn't purely brand-new stock.
-  const conditionTags = sortConditions(product.conditions).filter((c) => c !== 'NEW');
+  // Only worth calling out when the product isn't purely brand-new stock. When
+  // the listing itself is flagged pre-loved we render that badge instead, so the
+  // derived PREOWNED tag is dropped to avoid saying the same thing twice.
+  const conditionTags = sortConditions(product.conditions).filter(
+    (c) => c !== 'NEW' && !(product.isPreOwned && c === 'PREOWNED'),
+  );
 
   return (
     <motion.article
@@ -40,6 +44,7 @@ export function ProductCard({ product }: { product: ProductCardType }) {
             {product.isBestSeller && <Badge>Best Seller</Badge>}
             {product.isNewArrival && <Badge>New</Badge>}
             {hasDiscount && <Badge tone="deal">-{product.discountPct}%</Badge>}
+            {product.isPreOwned && <Badge tone="condition">Pre-loved</Badge>}
             {conditionTags.map((c) => (
               <Badge key={c} tone="condition">
                 {CONDITION_LABELS[c]}

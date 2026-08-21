@@ -25,6 +25,8 @@ export interface ProductCard {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  /** Listing-level "Pre-loved" flag — separate from per-variant `conditions`. */
+  isPreOwned: boolean;
   /** Product-level installment opt-in (terms live in config/installment). */
   installmentAvailable: boolean;
   priceFrom: number;
@@ -80,6 +82,7 @@ export interface ProductDetail {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  isPreOwned: boolean;
   installmentAvailable: boolean;
   /** Minimum down payment as a % of the variant price (0–90). */
   installmentMinDownPct: number;
@@ -140,6 +143,8 @@ export interface ProductListParams {
   bestSeller?: boolean;
   newArrival?: boolean;
   deal?: boolean;
+  /** Restrict to listings flagged pre-loved. */
+  preOwned?: boolean;
   /** Restrict to products that accept installment plans. */
   installment?: boolean;
   inStock?: boolean;

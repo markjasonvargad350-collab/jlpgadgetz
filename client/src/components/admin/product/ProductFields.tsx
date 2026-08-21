@@ -23,6 +23,8 @@ export interface ProductFieldsValue {
   isNewArrival: boolean;
   isBestSeller: boolean;
   isDeal: boolean;
+  /** Marks the whole listing as second-hand. Per-unit state is variant condition. */
+  isPreOwned: boolean;
 }
 
 export const emptyProductFields: ProductFieldsValue = {
@@ -42,6 +44,7 @@ export const emptyProductFields: ProductFieldsValue = {
   isNewArrival: false,
   isBestSeller: false,
   isDeal: false,
+  isPreOwned: false,
 };
 
 const FLAGS: { key: keyof ProductFieldsValue; label: string }[] = [
@@ -49,6 +52,7 @@ const FLAGS: { key: keyof ProductFieldsValue; label: string }[] = [
   { key: 'isNewArrival', label: 'New arrival' },
   { key: 'isBestSeller', label: 'Best seller' },
   { key: 'isDeal', label: 'On deal' },
+  { key: 'isPreOwned', label: 'Pre-loved / pre-owned' },
 ];
 
 /** The core product attributes form (shared by create + edit). */
@@ -143,6 +147,11 @@ export function ProductFields({
             );
           })}
         </div>
+        <p className="mt-2 text-xs text-ink-soft">
+          “Pre-loved / pre-owned” marks the whole listing as second-hand — it shows a badge on the storefront and puts
+          the product in the Pre-loved section. The condition of each individual unit (brand new, open box, pre-owned,
+          refurbished) is still set per variant below.
+        </p>
       </div>
 
       {/* Installment opt-in. Monthly = price ÷ term, computed server-side — there

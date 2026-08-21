@@ -15,6 +15,7 @@ import bcrypt from 'bcryptjs';
 import {
   Prisma,
   ProductStatus,
+  ProductCondition,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
@@ -26,14 +27,26 @@ import {
 import { prisma, disconnectPrisma } from '../src/config/prisma';
 import { env, isProd } from '../src/config/env';
 import { WAREHOUSE, deriveDestination, routeFor } from '../src/config/delivery';
+// Installment money is NEVER hand-written here: the seed calls the same
+// authoritative computation the API uses at apply time.
+import { computeSchedule } from '../src/config/installment';
+// Demo/presentation data shared with the additive prisma/demo-data.ts script.
+import {
+  img,
+  skuFor,
+  BRANCH_DEFS,
+  INSTALLMENT_MIN_DOWN_PCT,
+  PRE_LOVED_DEMO,
+  PRE_LOVED_STOCK,
+  TRADE_IN_DEMOS,
+  INSTALLMENT_DEMOS,
+  type Color,
+  type ProductDef,
+} from './demo-defs';
 
 // --- helpers ----------------------------------------------------------------
 
 const money = (n: number) => new Prisma.Decimal(n.toFixed(2));
-
-/** placehold.co image, on-brand Sunset Glass colors, clearly a placeholder. */
-const img = (text: string) =>
-  `https://placehold.co/1000x1000/FFF9F4/F4590A?text=${encodeURIComponent(text)}`;
 
 const yyyymmdd = (d: Date) =>
   `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -44,9 +57,18 @@ const daysAgo = (n: number) => {
   return d;
 };
 
-// --- color palettes ---------------------------------------------------------
+/** Mirrors `addMonths` in installment.service.ts — day clamped to month length. */
+const addMonths = (date: Date, n: number) => {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(day, lastDay));
+  return d;
+};
 
-type Color = { name: string; hex: string; code: string };
+// --- color palettes ---------------------------------------------------------
 
 const TITANIUM: Color[] = [
   { name: 'Natural Titanium', hex: '#B7B4A8', code: 'NT' },
@@ -79,27 +101,8 @@ const SE_COLORS: Color[] = [
 ];
 
 // --- catalog definition ------------------------------------------------------
-
-type StorageDef = { label: string; price: number };
-type ProductDef = {
-  name: string;
-  slug: string;
-  model: string;
-  categorySlug: string;
-  description: string;
-  highlights: string[];
-  releaseYear: number;
-  skuBase: string;
-  storages: StorageDef[];
-  colors: Color[];
-  discountPct?: number;
-  flags?: Partial<{
-    isFeatured: boolean;
-    isNewArrival: boolean;
-    isBestSeller: boolean;
-    isDeal: boolean;
-  }>;
-};
+// `ProductDef` / `Color` / `StorageDef` live in ./demo-defs so the additive
+// demo-data script can reuse them.
 
 const IPHONES: ProductDef[] = [
   {
@@ -281,6 +284,9 @@ const IPHONES: ProductDef[] = [
     discountPct: 15,
     flags: { isDeal: true },
   },
+  // The second-hand demo listing lives in ./demo-defs so the additive
+  // demo-data script can add the exact same product to an existing database.
+  PRE_LOVED_DEMO,
 ];
 
 const ACCESSORIES: ProductDef[] = [
@@ -357,6 +363,7 @@ const ACCESSORIES: ProductDef[] = [
 const STOCK_OVERRIDES: Record<string, number> = {
   'IP13MINI-128-MID': 3, // low stock (below threshold of 5)
   'IPSE-64-STL': 0, // out of stock
+  ...PRE_LOVED_STOCK, // second-hand units are one-offs, never 25 on hand
 };
 // Seed lifetime sales so best-seller ranking is meaningful before any orders.
 const INITIAL_SOLD: Record<string, number> = {
@@ -434,32 +441,13 @@ async function main() {
   console.log(`   ✓ Staff user: ${staff.email}`);
 
   // --- Branches -------------------------------------------------------------
-  // JLP Gadgetz Center's three locations. Stock is GLOBAL — a branch is a
-  // customer-selectable pickup / contact point, never a separate inventory.
-  //
-  // Only Passi has a street address we actually know, so it's the only one with
-  // `addressLine`; the others carry city/province only. `hours` and lat/lng are
-  // deliberately left null rather than invented — the owner fills them in from
-  // Admin → Branches, which is also where the per-branch phone/email live.
-  const branchDefs = [
-    {
-      name: 'Passi Branch',
-      slug: 'passi',
-      city: 'Passi City',
-      province: 'Iloilo',
-      addressLine: 'Dorillo Street, Passi City, Passi, Philippines, 5037',
-      phone: '0930 119 7407',
-      email: 'jlpgadgetzcenter@gmail.com',
-      position: 1,
-      isDefault: true, // pre-selected in pickers
-    },
-    { name: 'Kalibo Branch', slug: 'kalibo', city: 'Kalibo', province: 'Aklan', position: 2 },
-    { name: 'Sara Branch', slug: 'sara', city: 'Sara', province: 'Iloilo', position: 3 },
-  ];
-  for (const b of branchDefs) {
-    await prisma.branch.create({ data: b });
+  // Defined in ./demo-defs (shared with the additive demo-data script).
+  const branches = new Map<string, string>();
+  for (const b of BRANCH_DEFS) {
+    const created = await prisma.branch.create({ data: b });
+    branches.set(b.slug, created.id);
   }
-  console.log(`   ✓ ${branchDefs.length} branches`);
+  console.log(`   ✓ ${BRANCH_DEFS.length} branches`);
 
   // --- Categories -----------------------------------------------------------
   const categoryDefs = [
@@ -502,6 +490,10 @@ async function main() {
         isNewArrival: def.flags?.isNewArrival ?? false,
         isBestSeller: def.flags?.isBestSeller ?? false,
         isDeal: def.flags?.isDeal ?? false,
+        isPreOwned: def.flags?.isPreOwned ?? false,
+        // Presence in the shared opt-in table is what enables installments.
+        installmentAvailable: INSTALLMENT_MIN_DOWN_PCT[def.slug] !== undefined,
+        installmentMinDownPct: INSTALLMENT_MIN_DOWN_PCT[def.slug] ?? 0,
         categoryId,
         images: {
           create: [
@@ -515,8 +507,7 @@ async function main() {
 
     for (const storage of def.storages) {
       for (const color of def.colors) {
-        const storageCode = storage.label.replace('GB', '').replace('TB', 'T');
-        const sku = `${def.skuBase}-${storageCode}-${color.code}`;
+        const sku = skuFor(def.skuBase, storage.label, color.code);
         const stock = STOCK_OVERRIDES[sku] ?? 25;
         const soldQty = INITIAL_SOLD[sku] ?? 0;
 
@@ -529,8 +520,12 @@ async function main() {
             price: money(storage.price),
             stock,
             soldQty,
-            lowStockThreshold: 5,
+            lowStockThreshold: def.lowStockThreshold ?? 5,
             imageUrl: img(`${def.name} ${color.name}`),
+            // Per-unit truth. Defaults to NEW; second-hand defs carry `unit`.
+            condition: def.unit?.condition ?? ProductCondition.NEW,
+            batteryHealth: def.unit?.batteryHealth ?? null,
+            conditionNote: def.unit?.conditionNote ?? null,
             productId: product.id,
           },
         });
@@ -754,6 +749,97 @@ async function main() {
     });
   }
 
+  // --- Demo trade-in applications -------------------------------------------
+  // So Admin → Trade-ins isn't empty on a fresh install. The definitions live in
+  // ./demo-defs so the additive demo-data script creates the identical rows.
+  for (const t of TRADE_IN_DEMOS) {
+    const submittedAt = daysAgo(t.daysAgo);
+    const reference = `TRD-${yyyymmdd(submittedAt)}-${String(t.seq).padStart(4, '0')}`;
+    await prisma.tradeIn.create({
+      data: {
+        reference,
+        customerName: t.customerName,
+        customerEmail: t.customerEmail,
+        customerPhone: t.customerPhone,
+        deviceBrand: t.deviceBrand,
+        deviceModel: t.deviceModel,
+        storage: t.storage,
+        color: t.color,
+        condition: t.condition,
+        batteryHealth: t.batteryHealth,
+        hasBox: t.hasBox,
+        hasCharger: t.hasCharger,
+        issues: t.issues,
+        branchId: branches.get(t.branchSlug) ?? null,
+        status: t.status,
+        quotedValue: t.quotedValue != null ? money(t.quotedValue) : null,
+        staffNotes: t.staffNotes,
+        reviewedByAdminId: t.quotedValue != null ? admin.id : null,
+        createdAt: submittedAt,
+      },
+    });
+    console.log(`   ✓ Trade-in ${reference} (${t.status})`);
+  }
+
+  // --- Demo installment applications ----------------------------------------
+  // Both plans get their money from `computeSchedule` — the SAME function the API
+  // uses — so the seed can't drift from the live math: monthly = principal ÷ term
+  // with no interest or fees, and the final row absorbs the rounding remainder.
+  for (const p of INSTALLMENT_DEMOS) {
+    const appliedAt = daysAgo(p.daysAgo);
+    const v = variantsBySku.get(p.sku);
+    if (!v) throw new Error(`Demo installment references unknown SKU ${p.sku}`);
+
+    const downPayment = money(p.downPayment);
+    const { principal, monthlyAmount, rows } = computeSchedule(v.price, p.termMonths, downPayment);
+    const reference = `INS-${yyyymmdd(appliedAt)}-${String(p.seq).padStart(4, '0')}`;
+
+    await prisma.installmentPlan.create({
+      data: {
+        reference,
+        customerName: p.customerName,
+        customerEmail: p.customerEmail,
+        customerPhone: p.customerPhone,
+        // Snapshot at apply time — the live variant price may change later, this
+        // plan's price must not.
+        productName: v.productName,
+        variantLabel: `${v.storage} · ${v.color}`,
+        productPrice: v.price,
+        variantId: v.id,
+        branchId: branches.get(p.branchSlug) ?? null,
+        termMonths: p.termMonths,
+        downPayment,
+        principal,
+        monthlyAmount,
+        status: p.status,
+        staffNotes: p.staffNotes,
+        approvedByAdminId: p.status === 'PENDING' ? null : admin.id,
+        createdAt: appliedAt,
+        payments: {
+          create: rows.map((row) => {
+            const settled = row.sequence <= p.paidRows;
+            return {
+              sequence: row.sequence,
+              dueDate: addMonths(appliedAt, row.sequence),
+              amountDue: row.amountDue,
+              // Payment rows are additive: a settled row is UPDATED in place by
+              // the record-payment endpoint, never replaced or deleted.
+              amountPaid: settled ? row.amountDue : money(0),
+              status: settled ? 'PAID' : 'PENDING',
+              paidAt: settled ? addMonths(appliedAt, row.sequence) : null,
+              method: settled ? PaymentMethod.GCASH : null,
+              reference: settled ? `SIM-${reference}-${row.sequence}` : null,
+              recordedByAdminId: settled ? admin.id : null,
+            };
+          }),
+        },
+      },
+    });
+    console.log(
+      `   ✓ Installment ${reference} — ${p.termMonths} × ${monthlyAmount.toString()} (${p.status})`,
+    );
+  }
+
   // --- Notifications + audit log --------------------------------------------
   await prisma.notification.createMany({
     data: [
@@ -786,7 +872,13 @@ async function main() {
       adminId: admin.id,
       action: 'seed.run',
       entityType: 'System',
-      meta: { productCount, variantCount, orders: sampleOrders.length },
+      meta: {
+        productCount,
+        variantCount,
+        orders: sampleOrders.length,
+        tradeIns: TRADE_IN_DEMOS.length,
+        installmentPlans: INSTALLMENT_DEMOS.length,
+      },
     },
   });
 

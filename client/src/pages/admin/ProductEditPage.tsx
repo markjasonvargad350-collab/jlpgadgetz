@@ -68,6 +68,7 @@ function productToFields(p: AdminProductDetail): ProductFieldsValue {
     isNewArrival: p.isNewArrival,
     isBestSeller: p.isBestSeller,
     isDeal: p.isDeal,
+    isPreOwned: p.isPreOwned,
   };
 }
 
@@ -88,6 +89,7 @@ function toCreateInput(f: ProductFieldsValue): ProductCreateInput {
     isNewArrival: f.isNewArrival,
     isBestSeller: f.isBestSeller,
     isDeal: f.isDeal,
+    isPreOwned: f.isPreOwned,
     releaseYear: f.releaseYear.trim() ? Number(f.releaseYear) : undefined,
   };
 }
@@ -110,6 +112,7 @@ function toUpdateInput(f: ProductFieldsValue): ProductUpdateInput {
     isNewArrival: f.isNewArrival,
     isBestSeller: f.isBestSeller,
     isDeal: f.isDeal,
+    isPreOwned: f.isPreOwned,
     releaseYear: f.releaseYear.trim() ? Number(f.releaseYear) : null, // nullable — clears when empty
   };
 }

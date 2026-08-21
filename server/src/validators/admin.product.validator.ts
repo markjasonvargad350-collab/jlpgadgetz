@@ -42,6 +42,9 @@ export const createProductSchema = z.object({
   isNewArrival: z.boolean().optional(),
   isBestSeller: z.boolean().optional(),
   isDeal: z.boolean().optional(),
+  // Listing-level "Pre-loved" flag — merchandising only; per-unit state lives on
+  // each variant's `condition`.
+  isPreOwned: z.boolean().optional(),
   releaseYear: z.number().int().min(2000).max(2100).optional(),
   categoryId: z.string().trim().min(1),
   // Per-product installment opt-in + minimum down payment (% of price, 0–90).
@@ -66,6 +69,7 @@ export const updateProductSchema = z
     isNewArrival: z.boolean().optional(),
     isBestSeller: z.boolean().optional(),
     isDeal: z.boolean().optional(),
+    isPreOwned: z.boolean().optional(),
     releaseYear: z.number().int().min(2000).max(2100).nullable().optional(),
     categoryId: z.string().trim().min(1).optional(),
     installmentAvailable: z.boolean().optional(),
