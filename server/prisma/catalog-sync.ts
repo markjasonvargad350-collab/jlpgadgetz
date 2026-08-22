@@ -515,7 +515,18 @@ async function main() {
       `retired: ${counters.variantsRetired} (${counters.unitsZeroed} phantom unit(s) zeroed) · ` +
       `placeholder images added: ${counters.imagesAdded}`,
   );
-  console.log('   No product, variant, order or ledger row was deleted. No existing stock was changed.\n');
+  console.log('   No product, variant, order or ledger row was deleted.');
+  // Don't claim stock was left alone when retirement zeroes it — 1,897 phantom
+  // units is exactly the kind of number someone needs to see acknowledged.
+  if (counters.unitsZeroed > 0) {
+    console.log(
+      `   Stock ${DRY ? 'would be' : 'was'} written on the ${counters.variantsRetired} retired demo variant(s) only: ` +
+        `${counters.unitsZeroed} phantom unit(s) → 0, each through the ledger as an ADJUSTMENT.`,
+    );
+    console.log('   Stock on every variant the store keeps selling is untouched.\n');
+  } else {
+    console.log('   No stock was changed.\n');
+  }
 
   // Last, so the summary above is still printed: a skipped SKU means this
   // listing is missing an option, which is a failure even though every other
