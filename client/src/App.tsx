@@ -4,17 +4,28 @@ import { StoreLayout } from './layouts/StoreLayout';
 import { HomePage } from './pages/HomePage';
 import { CatalogPage } from './pages/CatalogPage';
 import { ProductPage } from './pages/ProductPage';
-import { CartPage } from './pages/CartPage';
-import { CheckoutPage } from './pages/CheckoutPage';
-import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
-import { TrackOrderPage } from './pages/TrackOrderPage';
-import { TradeInPage } from './pages/TradeInPage';
-import { InstallmentPage } from './pages/InstallmentPage';
-import { AboutPage } from './pages/AboutPage';
-import { NotFoundPage } from './pages/NotFoundPage';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { RequireAuth } from './routes/RequireAuth';
-import { PageLoader } from './components/admin/ui/Spinner';
+import { Spinner, PageLoader } from './components/admin/ui/Spinner';
+
+// Eager, above: the three pages a visitor can land on cold from Google, a
+// Facebook link or a QR code — home, the catalogue and a product. Splitting
+// those would only add a round-trip to the most common first paint.
+//
+// Lazy, below: everything a visitor reaches by clicking something, by which
+// point the chunk fetches against a warm connection. Keeps the pages nobody
+// visits on a browse-only session (checkout, trade-in, installments, tracking)
+// out of the entry bundle.
+const CartPage = lazy(() => import('./pages/CartPage').then((m) => ({ default: m.CartPage })));
+const CheckoutPage = lazy(() => import('./pages/CheckoutPage').then((m) => ({ default: m.CheckoutPage })));
+const OrderConfirmationPage = lazy(() =>
+  import('./pages/OrderConfirmationPage').then((m) => ({ default: m.OrderConfirmationPage })),
+);
+const TrackOrderPage = lazy(() => import('./pages/TrackOrderPage').then((m) => ({ default: m.TrackOrderPage })));
+const TradeInPage = lazy(() => import('./pages/TradeInPage').then((m) => ({ default: m.TradeInPage })));
+const InstallmentPage = lazy(() => import('./pages/InstallmentPage').then((m) => ({ default: m.InstallmentPage })));
+const AboutPage = lazy(() => import('./pages/AboutPage').then((m) => ({ default: m.AboutPage })));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 
 // The entire admin back-office is code-split behind React.lazy: it sits behind
 // session auth and is never reached by storefront visitors, so deferring it
@@ -43,6 +54,17 @@ const BranchesPage = lazy(() => import('./pages/admin/BranchesPage').then((m) =>
 const BranchEditPage = lazy(() => import('./pages/admin/BranchEditPage').then((m) => ({ default: m.BranchEditPage })));
 const ReportsPage = lazy(() => import('./pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 
+/** Fallback for a storefront chunk in flight. Deliberately not `PageLoader`,
+ *  which is `min-h-screen`: this renders *inside* StoreLayout, below a nav that
+ *  is already painted, so a full-viewport spinner would push the footer off. */
+function RouteFallback() {
+  return (
+    <div className="grid min-h-[60vh] place-items-center">
+      <Spinner size={24} />
+    </div>
+  );
+}
+
 /**
  * Route map. Public pages render inside StoreLayout; the admin subtree lives
  * under a pathless AdminAuthProvider wrapper (so the storefront never probes
@@ -55,14 +77,26 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/shop" element={<CatalogPage />} />
         <Route path="/product/:slug" element={<ProductPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/order/:orderNumber" element={<OrderConfirmationPage />} />
-        <Route path="/track-order" element={<TrackOrderPage />} />
-        <Route path="/trade-in" element={<TradeInPage />} />
-        <Route path="/installment" element={<InstallmentPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+
+        {/* The lazy storefront pages share one Suspense boundary nested inside
+            StoreLayout, so the nav and footer stay on screen while a route
+            chunk downloads instead of the whole shell flashing. */}
+        <Route
+          element={
+            <Suspense fallback={<RouteFallback />}>
+              <Outlet />
+            </Suspense>
+          }
+        >
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/order/:orderNumber" element={<OrderConfirmationPage />} />
+          <Route path="/track-order" element={<TrackOrderPage />} />
+          <Route path="/trade-in" element={<TradeInPage />} />
+          <Route path="/installment" element={<InstallmentPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Route>
 
       <Route
