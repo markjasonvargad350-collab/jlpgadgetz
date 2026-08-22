@@ -17,6 +17,7 @@
     "catalog:sync": "tsx prisma/catalog-sync.ts",
     "demo:data": "tsx prisma/demo-data.ts",
     "admin:doctor": "tsx prisma/admin-doctor.ts",
+    "stock:set": "tsx prisma/stock-set.ts",
     "reset:transactions": "tsx prisma/reset-transactions.ts"
   },
   "dependencies": {

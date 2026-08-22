@@ -218,18 +218,26 @@ DATABASE_URL="<neon-direct-url>" npm run catalog:sync -- --dry-run
 ## Going live: clean slate
 
 `npm run seed` can't help a database that's already serving customers — it wipes
-every table and refuses `NODE_ENV=production`. Two **live-safe** scripts cover the
-jobs you actually need on a running store. Both print the **DB host** before they do
-anything (so you can see you're pointed at Neon and not a dev database), both write
-**nothing** until you pass `--yes`, and neither ever touches the catalog:
+every table and refuses `NODE_ENV=production`. Three **live-safe** scripts cover the
+jobs you actually need on a running store. All three print the **DB host** before they
+do anything (so you can see you're pointed at Neon and not a dev database), all three
+write **nothing** until you pass `--yes`, and none of them ever touches prices, photos
+or products:
 
 | Command | Default behaviour | With `--yes` |
 |---|---|---|
 | `npm run admin:doctor` | Read-only. Lists every role and user and says, per account, whether it can adjust stock | Only with `--grant-admin=<email>`: moves that one account onto the `ADMIN` role and reactivates it |
+| `npm run stock:set` | Dry run. Reads a CSV of real counts and prints the before → after for each variant | Sets those counts, each as an `ADJUSTMENT` in the inventory ledger |
 | `npm run reset:transactions` | Dry run. Counts what exists and prints the exact plan | Deletes the order history and rewrites the inventory ledger to opening balances |
 
-> The connection string is a **secret**. Pass it inline for the one command, don't
-> save it to `.env`, don't paste it into a commit or a chat.
+> The connection string is a **secret**. Keep it in `server/.env` (which is gitignored)
+> so it stays off your command line and out of your shell history — then the commands
+> below work as written, with no `DATABASE_URL=` prefix. Never paste it into a commit,
+> an issue or a chat message. If it does get out, rotate the password in the Neon
+> dashboard and update it in `server/.env` **and** in Render → Environment.
+
+> **Heads-up:** with a live `DATABASE_URL` in `server/.env`, `npm run dev` also points
+> at production. Comment it out when you go back to local work.
 
 ### "There's no **Adjust** button in Admin → Inventory"
 
@@ -239,13 +247,12 @@ a note where the button belongs. Nothing inside the app can grant a role, so the
 repair is out-of-band:
 
 ```bash
-cd server
-DATABASE_URL="<neon-direct-url>" npm run admin:doctor
+npm --prefix server run admin:doctor
 ```
 Read the verdict line under each user (`can adjust stock / delete products: …`).
 If no account says `YES`, put one back on ADMIN:
 ```bash
-DATABASE_URL="<neon-direct-url>" npm run admin:doctor -- --grant-admin=you@domain.com --yes
+npm --prefix server run admin:doctor -- --grant-admin=you@domain.com --yes
 ```
 It never deletes anything and never changes a password, an email or a name. Reload
 `/admin` and the button is back. On server builds from **before** the role check
@@ -253,19 +260,61 @@ started reading the database (`requireRole` in `src/middleware/auth.ts`), also s
 out and back in — the old build read your role from the session cookie, which lives
 for `JWT_EXPIRES_IN` (7 days).
 
+### Setting the real stock counts
+
+`catalog:sync` stocks each new variant with a **placeholder** (1 for pre-owned, 3 for
+standard/brand new) because a price sheet doesn't carry quantities. For a handful of
+corrections, **Admin → Inventory → Adjust** → *"Set to value"* is the right tool. For a
+whole opening inventory it's one modal per variant, so there's a bulk path that does
+exactly the same thing:
+
+Fill in the `REAL_QTY` column of `stock-worksheet.csv` at the repo root —
+
+```
+SKU,Model,Storage,Condition,CashPrice,CurrentStock,REAL_QTY
+IP11-128-PRE,iPhone 11,128GB,Pre-owned,13990,1,4
+```
+
+- **A number** (including `0`) sets that variant's stock to it. `0` means *counted, none
+  in stock* — the listing stays published and shows as out of stock.
+- **Blank** means *leave this one alone*, so you can do the count in batches.
+- Only `SKU` and `REAL_QTY` are read; the other columns are there so you can see what
+  you're counting. Columns are matched by name, so reordering them in Excel is fine.
+
+```bash
+npm --prefix server run stock:set
+```
+That's a **dry run** — it prints `current → target (delta)` per variant and writes
+nothing. Read it, then commit:
+```bash
+npm --prefix server run stock:set -- --yes
+```
+
+Every change goes through the same `recordInventoryChange` the Adjust modal uses, as an
+`ADJUSTMENT` with the reason *"Physical stock count (worksheet)"* — so each one shows up
+under Admin → Inventory → Transactions and the ledger still sums to on-hand stock. A
+variant already holding the right number gets no ledger row. Anything not in the
+worksheet — accessories included — is untouched.
+
+It's deliberately strict: a `REAL_QTY` that isn't a whole number ≥ 0, a SKU that isn't in
+the database, or the same SKU twice, and it reports every problem with its spreadsheet
+line number and applies **none** of the file. A half-applied physical count is worse than
+no count. The real run is one transaction, so a dropped connection changes nothing.
+
+Use `--file=<path>` for a worksheet somewhere else.
+
 ### Clearing the test orders
 
 Before you open for real, wipe the orders you placed while testing — without losing
 the stock counts you just typed in:
 
 ```bash
-cd server
-DATABASE_URL="<neon-direct-url>" npm run reset:transactions
+npm --prefix server run reset:transactions
 ```
 That's a **dry run**: it prints per-table counts and the plan, and writes nothing.
 Read it, then commit:
 ```bash
-DATABASE_URL="<neon-direct-url>" npm run reset:transactions -- --yes
+npm --prefix server run reset:transactions -- --yes
 ```
 
 What it does:
@@ -295,15 +344,16 @@ DATABASE_URL="<neon-direct-url>" npm run reset:transactions -- --trade-ins --ins
 2. `npm run admin:doctor` → confirm an account is on ADMIN; `--grant-admin=… --yes`
    if none is.
 3. `npm run catalog:sync -- --dry-run` → read the plan → re-run without `--dry-run`.
-4. Set the real stock in **Admin → Inventory → Adjust** ("Set to value"), and price
-   anything still in Draft before activating it.
+4. Set the real stock, and price anything still in Draft before activating it. Either
+   **Admin → Inventory → Adjust** ("Set to value") variant by variant, or fill in
+   `stock-worksheet.csv` and run `npm run stock:set` (dry run) → `-- --yes`.
 5. Spot-check the storefront and place a test order or two.
 6. **Last:** `npm run reset:transactions` (read the dry run) → `-- --yes`. Confirm
    Inventory totals are unchanged and Transactions shows one *Opening balance* row
    per stocked variant.
 
-Steps 2, 3 and 6 all need `DATABASE_URL="<neon-direct-url>"` in front of them, from
-`server/`.
+Every script step reads `DATABASE_URL` from `server/.env`; prefix it inline instead if
+you'd rather not keep the live credential on disk.
 
 ---
 

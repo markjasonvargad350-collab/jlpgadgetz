@@ -294,6 +294,18 @@ a branch is the customer's preferred pickup/contact shop, nothing more.
 > every account and says which of them can change stock (see
 > [DEPLOYMENT.md → Going live: clean slate](DEPLOYMENT.md#going-live-clean-slate)).
 
+**Counting the whole shop at once.** The products loaded from your price sheet start
+with a **placeholder** quantity (1 for each pre-owned unit, 3 for each standard /
+brand new one), because a price list doesn't say how many you have. Setting them one
+by one is a lot of clicking, so there's a spreadsheet shortcut:
+`stock-worksheet.csv` in the project folder lists every variant with its price and
+its current count, and one empty column — **REAL_QTY**. Write your real number in
+each row you've counted, use **0** where you have none left, leave a row **blank** to
+come back to it later, and send the file to your developer to run
+`npm run stock:set`. Each count lands in the ledger as a *Correction* exactly as if
+you'd typed it into **Adjust**, so **Inventory → Transactions** still shows the full
+history.
+
 ---
 
 ## 7. Photos
@@ -425,7 +437,10 @@ Everything else in this guide you control. These are in code:
 2. **The installment terms** — fixed at 3, 6, 9 and 12 months, interest-free.
    Changing the available terms is a code change.
 3. **Who is an ADMIN** — granting the role that can change stock (see [§6](#6-stock--how-quantities-work)).
-4. **Clearing the test orders** before you open for real. There's no button for
+4. **Loading a whole stock-take at once** from `stock-worksheet.csv`
+   (`npm run stock:set`, see [§6](#6-stock--how-quantities-work)). Counting in the
+   back office one variant at a time needs no developer.
+5. **Clearing the test orders** before you open for real. There's no button for
    this — orders are permanent records on purpose. A developer runs
    `npm run reset:transactions`, which deletes the practice orders and their
    payments/shipments but **keeps your stock counts**, leaving one *"Opening
