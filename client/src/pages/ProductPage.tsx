@@ -180,6 +180,14 @@ export function ProductPage() {
 
   const canBuy = !!selected && selected.inStock;
 
+  // Financing runs off the installment base price, which the shop sets above the
+  // cash price shown at the top of the page. Falls back to cash where no separate
+  // base is set — the same rule the server applies (installment.service.ts).
+  const cashPrice = selected ? selected.price : product.priceFrom;
+  const installmentBase = selected
+    ? (selected.installmentPrice ?? selected.price)
+    : (product.installmentPriceFrom ?? product.priceFrom);
+
   return (
     <div className={`${WIDTH} pt-8`}>
       {/* breadcrumb */}
@@ -297,8 +305,9 @@ export function ProductPage() {
             </div>
           )}
 
-          {/* color */}
-          {colors.length > 0 && (
+          {/* color — hidden when every variant shares one colour (nothing to pick;
+              the selection already defaults to it) */}
+          {colors.length > 1 && (
             <div className="mt-5">
               <p className="mb-2 text-sm font-semibold">
                 Color{color ? <span className="font-normal text-ink-soft"> · {color}</span> : null}
@@ -402,8 +411,11 @@ export function ProductPage() {
                 Prefer to pay monthly?
               </p>
               <p className="mt-1 text-sm text-ink-soft">
-                Split this into 3, 6, 9 or 12 months — the price divided by the term, with no interest or
-                added fees.
+                Split this into 3, 6, 9 or 12 months — no interest, no added fees. Each month is the
+                installment price {selected ? '' : 'from '}
+                <strong className="font-semibold text-ink">{formatPHP(installmentBase)}</strong> divided by
+                the term
+                {installmentBase !== cashPrice ? ', which sits a little above the cash price' : ''}.
               </p>
               <Link
                 to={

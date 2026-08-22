@@ -20,7 +20,7 @@ import { createTradeIn } from '../services/tradeIns';
 import { ApiError } from '../services/http';
 import { BranchPicker } from '../components/store/BranchPicker';
 import { CheckboxCard, SelectField, TextAreaField, TextField } from '../components/store/FormControls';
-import { CONDITION_LABELS, CONDITION_ORDER } from '../config/condition';
+import { CONDITION_LABELS, TRADE_IN_CONDITION_ORDER } from '../config/condition';
 import { BUSINESS } from '../config/business';
 import { formatBranchLocation, formatDateTime } from '../utils/format';
 import type { ProductCondition } from '../types/api';
@@ -99,7 +99,10 @@ function validate(form: FormState): FieldErrors {
   return e;
 }
 
-const CONDITION_OPTIONS = CONDITION_ORDER.map((c) => ({ value: c, label: CONDITION_LABELS[c] }));
+// "Standard" is JLP's own shelf grading, not something a seller can claim about
+// their own phone, so the customer list deliberately leaves it out (the server
+// rejects it too — see server/src/validators/tradein.validator.ts).
+const CONDITION_OPTIONS = TRADE_IN_CONDITION_ORDER.map((c) => ({ value: c, label: CONDITION_LABELS[c] }));
 
 const STEPS = [
   {

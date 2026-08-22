@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PackagePlus, Pencil } from 'lucide-react';
+import { PackagePlus, Pencil, ShieldAlert } from 'lucide-react';
 import { adjustStock } from '../../services/adminInventory';
 import { ApiError } from '../../services/http';
 import { Field, Input, Select, Textarea } from './ui/Field';
@@ -18,6 +18,27 @@ export interface AdjustTarget {
 }
 
 type DeltaType = 'RESTOCK' | 'RETURN' | 'CANCELLATION' | 'ADJUSTMENT';
+
+/**
+ * Stands in for the Adjust button when the signed-in account can't use it. Both
+ * the button and the `POST /admin/inventory/adjust` route are ADMIN-only, so a
+ * STAFF account otherwise just sees a missing control with no explanation — which
+ * reads as a broken page rather than a permission boundary.
+ */
+export function AdjustPermissionNote({ role, className = '' }: { role: string | null; className?: string }) {
+  return (
+    <p
+      className={`flex items-start gap-2 rounded-2xl bg-white/50 px-4 py-3 text-xs text-ink-soft ring-1 ring-white/60 ${className}`}
+    >
+      <ShieldAlert size={14} className="mt-px shrink-0 text-ink-soft" aria-hidden />
+      <span>
+        <span className="font-semibold text-ink">Stock adjustments need an ADMIN sign-in.</span>{' '}
+        {role ? `This account's role is ${role}.` : 'This account has no role assigned.'} An ADMIN can
+        change stock from Inventory → Adjust.
+      </span>
+    </p>
+  );
+}
 
 const DELTA_TYPES: { value: DeltaType; label: string; addOnly: boolean }[] = [
   { value: 'RESTOCK', label: 'Restock — new stock arrived', addOnly: true },

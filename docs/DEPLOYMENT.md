@@ -32,13 +32,14 @@ This guide deploys iStore to a **free, production-grade stack**:
 4. [Part C — Frontend (Vercel)](#part-c--frontend-vercel)
 5. [Part D — Wire the two origins together](#part-d--wire-the-two-origins-together)
 6. [Seed production (one time)](#seed-production-one-time)
-7. [Post-deploy verification](#post-deploy-verification)
-8. [The cross-origin cookie caveat (read this)](#the-cross-origin-cookie-caveat-read-this)
-9. [Redeploys, rollbacks & migrations](#redeploys-rollbacks--migrations)
-10. [Free-tier caveats](#free-tier-caveats)
-11. [Custom domains (optional)](#custom-domains-optional)
-12. [Troubleshooting](#troubleshooting)
-13. [Environment variable reference](#environment-variable-reference)
+7. [Going live: clean slate](#going-live-clean-slate)
+8. [Post-deploy verification](#post-deploy-verification)
+9. [The cross-origin cookie caveat (read this)](#the-cross-origin-cookie-caveat-read-this)
+10. [Redeploys, rollbacks & migrations](#redeploys-rollbacks--migrations)
+11. [Free-tier caveats](#free-tier-caveats)
+12. [Custom domains (optional)](#custom-domains-optional)
+13. [Troubleshooting](#troubleshooting)
+14. [Environment variable reference](#environment-variable-reference)
 
 ---
 
@@ -167,7 +168,12 @@ The frontend (Vercel) and API (Render) are on **different origins**, so the API 
 
 ## Seed production (one time)
 
-Migrations create the **empty** schema; seeding loads the admin/staff users, categories, demo products, and sample orders. Do this **once**, deliberately.
+Migrations create the **empty** schema; seeding loads the admin/staff users, categories, the real product catalog, and sample orders. Do this **once**, deliberately.
+
+> ⚠️ `npm run seed` is **destructive** — it wipes and rebuilds every table. It
+> refuses to run when `NODE_ENV=production` (which Render sets), so on a live
+> service it throws instead of deleting your data. That guard is deliberate: once
+> the store has real orders, use the **additive** loaders below instead.
 
 **Option 1 — Render Shell (recommended).** Render → `istore-api` → **Shell**:
 ```bash
@@ -187,7 +193,117 @@ npm run seed
 > The seed is written to be idempotent-friendly for the demo dataset, but treat
 > it as a **one-time** bootstrap. Re-running it is only for resetting demo data.
 
+### Loading the catalog into a live database
+
+Two additive loaders exist for a database that already holds real data. Both are
+safe to re-run, never delete anything, and never touch stock or photos:
+
+| Command | What it loads |
+|---|---|
+| `npm run catalog:sync` | The 26 real iPhone/iPad listings and their 48 options (prices, copy, flags) from `prisma/catalog-defs.ts`. Declarative: a re-run restores exactly those figures. Accessories are untouched. Add `-- --dry-run` to print the plan without writing |
+| `npm run demo:data` | Branches plus demo trade-in / installment applications — presentation data only, no products |
+
+`catalog:sync` must run **after** the migrations it depends on are applied (the
+`STANDARD` condition value and `ProductVariant.installmentPrice`), i.e. after the
+deploy that ships them:
+```bash
+cd server
+DATABASE_URL="<neon-direct-url>" npm run catalog:sync -- --dry-run
+```
+
 ✅ **Check:** log in at `https://<vercel-url>/admin` with your `ADMIN_EMAIL` / `ADMIN_PASSWORD`. The dashboard shows KPIs and products.
+
+---
+
+## Going live: clean slate
+
+`npm run seed` can't help a database that's already serving customers — it wipes
+every table and refuses `NODE_ENV=production`. Two **live-safe** scripts cover the
+jobs you actually need on a running store. Both print the **DB host** before they do
+anything (so you can see you're pointed at Neon and not a dev database), both write
+**nothing** until you pass `--yes`, and neither ever touches the catalog:
+
+| Command | Default behaviour | With `--yes` |
+|---|---|---|
+| `npm run admin:doctor` | Read-only. Lists every role and user and says, per account, whether it can adjust stock | Only with `--grant-admin=<email>`: moves that one account onto the `ADMIN` role and reactivates it |
+| `npm run reset:transactions` | Dry run. Counts what exists and prints the exact plan | Deletes the order history and rewrites the inventory ledger to opening balances |
+
+> The connection string is a **secret**. Pass it inline for the one command, don't
+> save it to `.env`, don't paste it into a commit or a chat.
+
+### "There's no **Adjust** button in Admin → Inventory"
+
+Changing stock is ADMIN-only — both the button and `POST /admin/inventory/adjust`
+are gated on the role name being exactly `ADMIN`. A `STAFF` account sees a dash and
+a note where the button belongs. Nothing inside the app can grant a role, so the
+repair is out-of-band:
+
+```bash
+cd server
+DATABASE_URL="<neon-direct-url>" npm run admin:doctor
+```
+Read the verdict line under each user (`can adjust stock / delete products: …`).
+If no account says `YES`, put one back on ADMIN:
+```bash
+DATABASE_URL="<neon-direct-url>" npm run admin:doctor -- --grant-admin=you@domain.com --yes
+```
+It never deletes anything and never changes a password, an email or a name. Reload
+`/admin` and the button is back. On server builds from **before** the role check
+started reading the database (`requireRole` in `src/middleware/auth.ts`), also sign
+out and back in — the old build read your role from the session cookie, which lives
+for `JWT_EXPIRES_IN` (7 days).
+
+### Clearing the test orders
+
+Before you open for real, wipe the orders you placed while testing — without losing
+the stock counts you just typed in:
+
+```bash
+cd server
+DATABASE_URL="<neon-direct-url>" npm run reset:transactions
+```
+That's a **dry run**: it prints per-table counts and the plan, and writes nothing.
+Read it, then commit:
+```bash
+DATABASE_URL="<neon-direct-url>" npm run reset:transactions -- --yes
+```
+
+What it does:
+
+- Deletes every **Order**, order item, payment, shipment and tracking row.
+  Numbering restarts on its own — the next order is `ORD-<date>-0001`.
+- **Keeps your stock counts** and rewrites the inventory ledger to match: every
+  `InventoryTransaction` is replaced with one *"Opening balance"* row per variant
+  that has stock, so Admin → Inventory → Transactions reads as a fresh shop instead
+  of a history of deleted test sales.
+- Zeroes `soldQty` and `reservedStock` — with the orders gone, a lifetime sold count
+  is a claim about sales that no longer exist, and it skews the best-seller sort.
+
+What it **never** touches: products, prices, photos, **stock counts**, categories,
+users, roles and branches.
+
+Trade-ins, installment plans and back-office notifications are **kept** by default.
+Add them explicitly if you want them cleared too (each still needs `--yes`):
+
+```bash
+DATABASE_URL="<neon-direct-url>" npm run reset:transactions -- --trade-ins --installments --notifications --yes
+```
+
+### Runbook
+
+1. **Push to `main`** → Render redeploys and runs `prisma migrate deploy` first.
+2. `npm run admin:doctor` → confirm an account is on ADMIN; `--grant-admin=… --yes`
+   if none is.
+3. `npm run catalog:sync -- --dry-run` → read the plan → re-run without `--dry-run`.
+4. Set the real stock in **Admin → Inventory → Adjust** ("Set to value"), and price
+   anything still in Draft before activating it.
+5. Spot-check the storefront and place a test order or two.
+6. **Last:** `npm run reset:transactions` (read the dry run) → `-- --yes`. Confirm
+   Inventory totals are unchanged and Transactions shows one *Opening balance* row
+   per stocked variant.
+
+Steps 2, 3 and 6 all need `DATABASE_URL="<neon-direct-url>"` in front of them, from
+`server/`.
 
 ---
 
@@ -288,6 +404,8 @@ everywhere. Choose Option 2 if admins use Safari or you want maximum robustness.
 | API calls blocked by **CORS** in the console | `CLIENT_URL` on Render doesn't include the exact Vercel origin | Add the exact origin (no trailing slash) to `CLIENT_URL`; redeploy |
 | Admin **login fails only in Safari** | third-party cookie blocked | Use the Vercel proxy (Option 2 above) |
 | `403 CSRF_BLOCKED` on legitimate admin actions | request `Origin` not in `CLIENT_URL` | Ensure `CLIENT_URL` lists the exact frontend origin serving the app |
+| **No "Adjust" button** in Admin → Inventory, just a dash | the signed-in account isn't on the `ADMIN` role (stock changes are ADMIN-only) | `npm run admin:doctor` to see who is; then `-- --grant-admin=<email> --yes` |
+| Adjust still returns **403** right after granting ADMIN | server build predates the DB-authoritative `requireRole`, so it reads the role from a cookie that lasts 7 days | Sign out and back in at `/admin`; redeploy the API to stop it recurring |
 | Render deploy **fails at build** on missing `prisma`/`tsc`/types | `NODE_ENV=production` made npm skip devDependencies, or `prisma generate` ran after `tsc` | Blueprint handles both (`npm install --include=dev`, then `prisma:generate` before `build`); keep that order if you customize it |
 | Service **won't boot**, logs say a var is invalid | prod guard rejected a weak/default secret/password or `localhost` `CLIENT_URL` | Set strong non-default values; https origins only |
 | `/api/health` returns **503** | DB unreachable | Check `DATABASE_URL` (direct string, `?sslmode=require`), Neon project not deleted |

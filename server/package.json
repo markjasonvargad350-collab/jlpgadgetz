@@ -14,7 +14,10 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "demo:data": "tsx prisma/demo-data.ts"
+    "catalog:sync": "tsx prisma/catalog-sync.ts",
+    "demo:data": "tsx prisma/demo-data.ts",
+    "admin:doctor": "tsx prisma/admin-doctor.ts",
+    "reset:transactions": "tsx prisma/reset-transactions.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

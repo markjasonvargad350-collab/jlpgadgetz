@@ -1,14 +1,15 @@
 /* eslint-disable no-console */
 // ============================================================================
-//  Seed — populates a fresh database with realistic demo data.
+//  Seed — builds a fresh database from scratch for local development.
 //
-//  Creates: admin role + user, categories, 10 iPhones + accessories with
-//  storage×color variants, an initial RESTOCK InventoryTransaction per variant
-//  (stock NEVER exists without a ledger entry), plus a few sample orders that
-//  run through the SAME transactional flow the real checkout uses
-//  (decrement stock → bump soldQty → write a SALE transaction).
+//  Creates: admin role + user, categories, the REAL product catalog
+//  (prisma/catalog-defs.ts) plus the accessories defined below, an initial
+//  RESTOCK InventoryTransaction per variant (stock NEVER exists without a ledger
+//  entry), and a few sample orders that run through the SAME transactional flow
+//  the real checkout uses (decrement stock → bump soldQty → write a SALE row).
 //
-//  Idempotent: wipes and rebuilds. Refuses to run in production.
+//  Destructive: wipes and rebuilds. Refuses to run in production — the live
+//  catalog is loaded by the additive `npm --prefix server run catalog:sync`.
 //  Run with:  npm --prefix server run seed
 // ============================================================================
 import bcrypt from 'bcryptjs';
@@ -31,18 +32,21 @@ import { WAREHOUSE, deriveDestination, routeFor } from '../src/config/delivery';
 // authoritative computation the API uses at apply time.
 import { computeSchedule } from '../src/config/installment';
 // Demo/presentation data shared with the additive prisma/demo-data.ts script.
+import { img, skuFor, BRANCH_DEFS, TRADE_IN_DEMOS, INSTALLMENT_DEMOS, type ProductDef } from './demo-defs';
+// The shop's real price list, shared with the additive prisma/catalog-sync.ts.
 import {
-  img,
-  skuFor,
-  BRANCH_DEFS,
-  INSTALLMENT_MIN_DOWN_PCT,
-  PRE_LOVED_DEMO,
-  PRE_LOVED_STOCK,
-  TRADE_IN_DEMOS,
-  INSTALLMENT_DEMOS,
-  type Color,
-  type ProductDef,
-} from './demo-defs';
+  REAL_CATALOG,
+  CATALOG_CATEGORY_DEFS,
+  CONDITION_NOTE,
+  PLACEHOLDER_COLOR,
+  DEFAULT_MIN_DOWN_PCT,
+  basePriceOf,
+  catalogSku,
+  isUnpriced,
+  lowStockThresholdOf,
+  openingStockOf,
+  type CatalogProductDef,
+} from './catalog-defs';
 
 // --- helpers ----------------------------------------------------------------
 
@@ -68,226 +72,11 @@ const addMonths = (date: Date, n: number) => {
   return d;
 };
 
-// --- color palettes ---------------------------------------------------------
-
-const TITANIUM: Color[] = [
-  { name: 'Natural Titanium', hex: '#B7B4A8', code: 'NT' },
-  { name: 'Blue Titanium', hex: '#5E6472', code: 'BT' },
-  { name: 'White Titanium', hex: '#F2F1EC', code: 'WT' },
-  { name: 'Black Titanium', hex: '#3B3B3D', code: 'KT' },
-];
-const GEN15: Color[] = [
-  { name: 'Black', hex: '#1F2020', code: 'BLK' },
-  { name: 'Blue', hex: '#D5E0E6', code: 'BLU' },
-  { name: 'Green', hex: '#D7E8D9', code: 'GRN' },
-  { name: 'Pink', hex: '#F5D9DE', code: 'PNK' },
-];
-const GEN14: Color[] = [
-  { name: 'Midnight', hex: '#1B1B1F', code: 'MID' },
-  { name: 'Starlight', hex: '#F4F2ED', code: 'STL' },
-  { name: 'Purple', hex: '#E5DEEC', code: 'PRP' },
-  { name: '(PRODUCT)RED', hex: '#C50A18', code: 'RED' },
-];
-const GEN13: Color[] = [
-  { name: 'Midnight', hex: '#1B1B1F', code: 'MID' },
-  { name: 'Starlight', hex: '#F4F2ED', code: 'STL' },
-  { name: 'Blue', hex: '#3C6E9A', code: 'BLU' },
-  { name: 'Pink', hex: '#F5D9DE', code: 'PNK' },
-];
-const SE_COLORS: Color[] = [
-  { name: 'Midnight', hex: '#1B1B1F', code: 'MID' },
-  { name: 'Starlight', hex: '#F4F2ED', code: 'STL' },
-  { name: '(PRODUCT)RED', hex: '#C50A18', code: 'RED' },
-];
-
-// --- catalog definition ------------------------------------------------------
-// `ProductDef` / `Color` / `StorageDef` live in ./demo-defs so the additive
-// demo-data script can reuse them.
-
-const IPHONES: ProductDef[] = [
-  {
-    name: 'iPhone 15 Pro Max',
-    slug: 'iphone-15-pro-max',
-    model: 'iPhone 15 Pro Max',
-    categorySlug: 'iphone',
-    description:
-      'The most advanced iPhone ever. Forged in aerospace-grade titanium with the powerful A17 Pro chip, a customizable Action button, and the most capable 5x Telephoto camera on iPhone.',
-    highlights: ['6.7" Super Retina XDR display', 'A17 Pro chip', '5x Telephoto camera', 'Titanium design'],
-    releaseYear: 2023,
-    skuBase: 'IP15PM',
-    storages: [
-      { label: '256GB', price: 89990 },
-      { label: '512GB', price: 102990 },
-      { label: '1TB', price: 114990 },
-    ],
-    colors: TITANIUM,
-    flags: { isFeatured: true, isBestSeller: true, isNewArrival: true },
-  },
-  {
-    name: 'iPhone 15 Pro',
-    slug: 'iphone-15-pro',
-    model: 'iPhone 15 Pro',
-    categorySlug: 'iphone',
-    description:
-      'Titanium. So strong. So light. So Pro. Powered by A17 Pro for console-level gaming and pro-grade cameras with the new Action button.',
-    highlights: ['6.1" Super Retina XDR display', 'A17 Pro chip', 'Pro camera system', 'Action button'],
-    releaseYear: 2023,
-    skuBase: 'IP15P',
-    storages: [
-      { label: '128GB', price: 79990 },
-      { label: '256GB', price: 89990 },
-      { label: '512GB', price: 102990 },
-    ],
-    colors: TITANIUM,
-    flags: { isFeatured: true, isBestSeller: true, isNewArrival: true },
-  },
-  {
-    name: 'iPhone 15 Plus',
-    slug: 'iphone-15-plus',
-    model: 'iPhone 15 Plus',
-    categorySlug: 'iphone',
-    description:
-      'A big 6.7" display and all-day battery life. Featuring the Dynamic Island, a 48MP Main camera, and USB-C.',
-    highlights: ['6.7" Super Retina XDR display', 'Dynamic Island', '48MP Main camera', 'USB-C'],
-    releaseYear: 2023,
-    skuBase: 'IP15PL',
-    storages: [
-      { label: '128GB', price: 64990 },
-      { label: '256GB', price: 71990 },
-    ],
-    colors: GEN15,
-    flags: { isNewArrival: true },
-  },
-  {
-    name: 'iPhone 15',
-    slug: 'iphone-15',
-    model: 'iPhone 15',
-    categorySlug: 'iphone',
-    description:
-      'The Dynamic Island. A 48MP Main camera with 2x Telephoto. And USB-C. iPhone 15 has all of this in a durable, color-infused glass design.',
-    highlights: ['6.1" Super Retina XDR display', 'Dynamic Island', '48MP Main camera', 'USB-C'],
-    releaseYear: 2023,
-    skuBase: 'IP15',
-    storages: [
-      { label: '128GB', price: 56990 },
-      { label: '256GB', price: 63990 },
-    ],
-    colors: GEN15,
-    flags: { isNewArrival: true, isBestSeller: true },
-  },
-  {
-    name: 'iPhone 14 Pro Max',
-    slug: 'iphone-14-pro-max',
-    model: 'iPhone 14 Pro Max',
-    categorySlug: 'iphone',
-    description:
-      'A magical new way to interact with iPhone via the Dynamic Island. A 48MP Main camera for stunning detail. And the Always-On display.',
-    highlights: ['6.7" ProMotion display', 'A16 Bionic', 'Dynamic Island', '48MP Main camera'],
-    releaseYear: 2022,
-    skuBase: 'IP14PM',
-    storages: [
-      { label: '128GB', price: 76990 },
-      { label: '256GB', price: 84990 },
-    ],
-    colors: [
-      { name: 'Space Black', hex: '#31302F', code: 'SBK' },
-      { name: 'Silver', hex: '#E3E4E5', code: 'SLV' },
-      { name: 'Deep Purple', hex: '#5B517E', code: 'DPP' },
-    ],
-    flags: { isBestSeller: true },
-  },
-  {
-    name: 'iPhone 14 Pro',
-    slug: 'iphone-14-pro',
-    model: 'iPhone 14 Pro',
-    categorySlug: 'iphone',
-    description:
-      'The Dynamic Island, Always-On display, and a 48MP Main camera in a 6.1" Pro design powered by A16 Bionic.',
-    highlights: ['6.1" ProMotion display', 'A16 Bionic', 'Dynamic Island', '48MP Main camera'],
-    releaseYear: 2022,
-    skuBase: 'IP14P',
-    storages: [
-      { label: '128GB', price: 69990 },
-      { label: '256GB', price: 77990 },
-    ],
-    colors: [
-      { name: 'Space Black', hex: '#31302F', code: 'SBK' },
-      { name: 'Silver', hex: '#E3E4E5', code: 'SLV' },
-      { name: 'Deep Purple', hex: '#5B517E', code: 'DPP' },
-    ],
-  },
-  {
-    name: 'iPhone 14',
-    slug: 'iphone-14',
-    model: 'iPhone 14',
-    categorySlug: 'iphone',
-    description:
-      'A great 6.1" display, an advanced dual-camera system, and Crash Detection — a new safety feature — all powered by A15 Bionic.',
-    highlights: ['6.1" Super Retina XDR display', 'A15 Bionic', 'Dual-camera system', 'Crash Detection'],
-    releaseYear: 2022,
-    skuBase: 'IP14',
-    storages: [
-      { label: '128GB', price: 51990 },
-      { label: '256GB', price: 58990 },
-    ],
-    colors: GEN14,
-    flags: { isBestSeller: true },
-  },
-  {
-    name: 'iPhone 13',
-    slug: 'iphone-13',
-    model: 'iPhone 13',
-    categorySlug: 'iphone',
-    description:
-      'A15 Bionic, a brighter Super Retina XDR display, and an advanced dual-camera system with Cinematic mode. A dependable classic.',
-    highlights: ['6.1" Super Retina XDR display', 'A15 Bionic', 'Cinematic mode', 'Great battery life'],
-    releaseYear: 2021,
-    skuBase: 'IP13',
-    storages: [
-      { label: '128GB', price: 43990 },
-      { label: '256GB', price: 49990 },
-    ],
-    colors: GEN13,
-    discountPct: 10,
-    flags: { isDeal: true },
-  },
-  {
-    name: 'iPhone 13 mini',
-    slug: 'iphone-13-mini',
-    model: 'iPhone 13 mini',
-    categorySlug: 'iphone',
-    description:
-      'All the power of iPhone 13 in a compact 5.4" design. A15 Bionic, Cinematic mode, and an advanced dual-camera system.',
-    highlights: ['5.4" Super Retina XDR display', 'A15 Bionic', 'Compact design', 'Cinematic mode'],
-    releaseYear: 2021,
-    skuBase: 'IP13MINI',
-    storages: [{ label: '128GB', price: 39990 }],
-    colors: GEN13,
-    discountPct: 12,
-    flags: { isDeal: true },
-  },
-  {
-    name: 'iPhone SE (3rd gen)',
-    slug: 'iphone-se-3rd-gen',
-    model: 'iPhone SE',
-    categorySlug: 'iphone',
-    description:
-      'The most affordable iPhone with the powerful A15 Bionic chip, a beloved 4.7" design with Touch ID, and 5G speed.',
-    highlights: ['4.7" Retina HD display', 'A15 Bionic', 'Touch ID', '5G'],
-    releaseYear: 2022,
-    skuBase: 'IPSE',
-    storages: [
-      { label: '64GB', price: 27990 },
-      { label: '128GB', price: 32990 },
-    ],
-    colors: SE_COLORS,
-    discountPct: 15,
-    flags: { isDeal: true },
-  },
-  // The second-hand demo listing lives in ./demo-defs so the additive
-  // demo-data script can add the exact same product to an existing database.
-  PRE_LOVED_DEMO,
-];
+// --- accessories -------------------------------------------------------------
+// The phones and iPads come from ./catalog-defs (the owner's real price list).
+// These five accessory listings are the shop's own and are intentionally kept
+// here, unchanged: they have colours instead of condition tiers and a single
+// price, so they don't fit the catalog def shape.
 
 const ACCESSORIES: ProductDef[] = [
   {
@@ -359,20 +148,142 @@ const ACCESSORIES: ProductDef[] = [
   },
 ];
 
-// Deliberate stock states so the UI/inventory features have something to show.
+// --- deliberate stock / sales states -----------------------------------------
+// So a fresh local database has a low-stock card, a sold-out card and a
+// meaningful best-seller ranking before any order exists. Nothing here applies
+// to the live database — catalog-sync never writes stock to an existing variant.
 const STOCK_OVERRIDES: Record<string, number> = {
-  'IP13MINI-128-MID': 3, // low stock (below threshold of 5)
-  'IPSE-64-STL': 0, // out of stock
-  ...PRE_LOVED_STOCK, // second-hand units are one-offs, never 25 on hand
+  'IP16-256-STD': 1, // low stock (at the standard tier's threshold of 2)
+  'IP17AIR-256-STD': 0, // out of stock
 };
-// Seed lifetime sales so best-seller ranking is meaningful before any orders.
 const INITIAL_SOLD: Record<string, number> = {
-  'IP15PM-256-NT': 42,
-  'IP15P-128-NT': 33,
-  'IP15-128-BLK': 51,
-  'IP14-128-MID': 60,
+  'IP15PM-256-STD': 42,
+  'IP15-128-STD': 51,
+  'IP14-128-STD': 60,
+  'IP13-128-PRE': 24,
   'APP2-Standard-WHT': 88,
 };
+
+// --- one shape for both kinds of definition ---------------------------------
+// Catalog defs carry one variant per priced row (storage × condition, two
+// prices); accessory defs cross-multiply storages × colours at one price. Both
+// normalise to this before a single create loop writes them.
+
+type VariantRow = {
+  sku: string;
+  storage: string;
+  color: string;
+  colorHex: string | null;
+  /** Cash price. */
+  price: number;
+  /** Installment base, or null to finance at the cash price. */
+  installmentPrice: number | null;
+  condition: ProductCondition;
+  batteryHealth: number | null;
+  conditionNote: string | null;
+  lowStockThreshold: number;
+  stock: number;
+  isActive: boolean;
+  imageUrl: string;
+};
+
+type SeedProduct = {
+  name: string;
+  slug: string;
+  model: string;
+  categorySlug: string;
+  description: string;
+  highlights: string[];
+  releaseYear: number;
+  basePrice: number;
+  discountPct: number;
+  status: ProductStatus;
+  installmentAvailable: boolean;
+  installmentMinDownPct: number;
+  flags: ProductDef['flags'];
+  rows: VariantRow[];
+};
+
+const fromCatalog = (def: CatalogProductDef): SeedProduct => ({
+  name: def.name,
+  slug: def.slug,
+  model: def.model,
+  categorySlug: def.categorySlug,
+  description: def.description,
+  highlights: def.highlights,
+  releaseYear: def.releaseYear,
+  // "From" price on the card = the cheapest cash price on the listing.
+  basePrice: basePriceOf(def),
+  // No discount is invented: the price list has one cash price per row, not a
+  // "was" price, so nothing shows a struck-through figure.
+  discountPct: 0,
+  status: def.status ?? ProductStatus.ACTIVE,
+  installmentAvailable: true,
+  installmentMinDownPct: def.installmentMinDownPct ?? DEFAULT_MIN_DOWN_PCT,
+  flags: def.flags,
+  rows: def.variants.map((v) => {
+    const sku = catalogSku(def, v);
+    return {
+      sku,
+      storage: v.storage,
+      // The price list has no colours, so one neutral placeholder per variant —
+      // renamed per unit in Admin → Variants.
+      color: PLACEHOLDER_COLOR.name,
+      colorHex: PLACEHOLDER_COLOR.hex,
+      price: v.cash,
+      installmentPrice: v.installment,
+      condition: v.condition,
+      // Never guessed. Staff read it off the actual unit and type it in admin.
+      batteryHealth: null,
+      conditionNote: CONDITION_NOTE[v.condition],
+      lowStockThreshold: lowStockThresholdOf(def, v),
+      stock: isUnpriced(v) ? 0 : (STOCK_OVERRIDES[sku] ?? openingStockOf(def, v)),
+      // An unpriced row exists so the owner can fill in its price, but it must
+      // never be sellable at ₱0.
+      isActive: !isUnpriced(v),
+      imageUrl: img(`${def.name} ${v.storage}`),
+    };
+  }),
+});
+
+const fromAccessory = (def: ProductDef): SeedProduct => ({
+  name: def.name,
+  slug: def.slug,
+  model: def.model,
+  categorySlug: def.categorySlug,
+  description: def.description,
+  highlights: def.highlights,
+  releaseYear: def.releaseYear,
+  basePrice: def.storages[0]!.price,
+  discountPct: 0,
+  status: ProductStatus.ACTIVE,
+  // Accessories are deliberately excluded from installments: a ₱1,190 charger
+  // on a 12-month plan is not a real offer.
+  installmentAvailable: false,
+  installmentMinDownPct: 0,
+  flags: def.flags,
+  rows: def.storages.flatMap((storage) =>
+    def.colors.map((color) => {
+      const sku = skuFor(def.skuBase, storage.label, color.code);
+      return {
+        sku,
+        storage: storage.label,
+        color: color.name,
+        colorHex: color.hex,
+        price: storage.price,
+        // Cash only — see installmentAvailable above.
+        installmentPrice: null,
+        condition: ProductCondition.NEW,
+        batteryHealth: null,
+        conditionNote: null,
+        lowStockThreshold: 5,
+        stock: STOCK_OVERRIDES[sku] ?? 25,
+        isActive: true,
+        imageUrl: img(`${def.name} ${color.name}`),
+      };
+    }),
+  ),
+});
 
 async function wipe() {
   // Delete in FK-safe order.
@@ -450,11 +361,13 @@ async function main() {
   console.log(`   ✓ ${BRANCH_DEFS.length} branches`);
 
   // --- Categories -----------------------------------------------------------
+  // iPhone + iPad come from ./catalog-defs (shared with catalog-sync); the
+  // accessory categories are the seed's own.
   const categoryDefs = [
-    { name: 'iPhone', slug: 'iphone', description: 'The latest and greatest iPhone lineup.', position: 1 },
-    { name: 'AirPods', slug: 'airpods', description: 'Wireless audio, redefined.', position: 2 },
-    { name: 'Chargers & Cables', slug: 'chargers', description: 'Power up anywhere.', position: 3 },
-    { name: 'Cases & Protection', slug: 'cases', description: 'Style meets protection.', position: 4 },
+    ...CATALOG_CATEGORY_DEFS,
+    { name: 'AirPods', slug: 'airpods', description: 'Wireless audio, redefined.', position: 3 },
+    { name: 'Chargers & Cables', slug: 'chargers', description: 'Power up anywhere.', position: 4 },
+    { name: 'Cases & Protection', slug: 'cases', description: 'Style meets protection.', position: 5 },
   ];
   const categories = new Map<string, string>();
   for (const c of categoryDefs) {
@@ -466,12 +379,23 @@ async function main() {
   // --- Products + variants + initial restock ledger -------------------------
   const variantsBySku = new Map<
     string,
-    { id: string; productName: string; color: string; storage: string; price: Prisma.Decimal }
+    {
+      id: string;
+      productName: string;
+      color: string;
+      storage: string;
+      /** Cash price — what an order line charges. */
+      price: Prisma.Decimal;
+      /** Installment base, or null to finance at the cash price. */
+      installmentPrice: Prisma.Decimal | null;
+    }
   >();
   let productCount = 0;
   let variantCount = 0;
 
-  for (const def of [...IPHONES, ...ACCESSORIES]) {
+  const seedProducts: SeedProduct[] = [...REAL_CATALOG.map(fromCatalog), ...ACCESSORIES.map(fromAccessory)];
+
+  for (const def of seedProducts) {
     const categoryId = categories.get(def.categorySlug);
     if (!categoryId) throw new Error(`Missing category for ${def.slug}`);
 
@@ -482,18 +406,17 @@ async function main() {
         model: def.model,
         description: def.description,
         highlights: def.highlights,
-        basePrice: money(def.storages[0]!.price),
-        discountPct: def.discountPct ?? 0,
-        status: ProductStatus.ACTIVE,
+        basePrice: money(def.basePrice),
+        discountPct: def.discountPct,
+        status: def.status,
         releaseYear: def.releaseYear,
         isFeatured: def.flags?.isFeatured ?? false,
         isNewArrival: def.flags?.isNewArrival ?? false,
         isBestSeller: def.flags?.isBestSeller ?? false,
         isDeal: def.flags?.isDeal ?? false,
         isPreOwned: def.flags?.isPreOwned ?? false,
-        // Presence in the shared opt-in table is what enables installments.
-        installmentAvailable: INSTALLMENT_MIN_DOWN_PCT[def.slug] !== undefined,
-        installmentMinDownPct: INSTALLMENT_MIN_DOWN_PCT[def.slug] ?? 0,
+        installmentAvailable: def.installmentAvailable,
+        installmentMinDownPct: def.installmentMinDownPct,
         categoryId,
         images: {
           create: [
@@ -505,54 +428,52 @@ async function main() {
     });
     productCount++;
 
-    for (const storage of def.storages) {
-      for (const color of def.colors) {
-        const sku = skuFor(def.skuBase, storage.label, color.code);
-        const stock = STOCK_OVERRIDES[sku] ?? 25;
-        const soldQty = INITIAL_SOLD[sku] ?? 0;
+    for (const row of def.rows) {
+      const soldQty = INITIAL_SOLD[row.sku] ?? 0;
 
-        const variant = await prisma.productVariant.create({
+      const variant = await prisma.productVariant.create({
+        data: {
+          sku: row.sku,
+          storage: row.storage,
+          color: row.color,
+          colorHex: row.colorHex,
+          price: money(row.price),
+          installmentPrice: row.installmentPrice != null ? money(row.installmentPrice) : null,
+          stock: row.stock,
+          soldQty,
+          lowStockThreshold: row.lowStockThreshold,
+          imageUrl: row.imageUrl,
+          isActive: row.isActive,
+          condition: row.condition,
+          batteryHealth: row.batteryHealth,
+          conditionNote: row.conditionNote,
+          productId: product.id,
+        },
+      });
+      variantCount++;
+      variantsBySku.set(row.sku, {
+        id: variant.id,
+        productName: def.name,
+        color: row.color,
+        storage: row.storage,
+        price: variant.price,
+        installmentPrice: variant.installmentPrice,
+      });
+
+      // The opening balance is itself a ledger entry: stock never appears
+      // out of thin air.
+      if (row.stock > 0) {
+        await prisma.inventoryTransaction.create({
           data: {
-            sku,
-            storage: storage.label,
-            color: color.name,
-            colorHex: color.hex,
-            price: money(storage.price),
-            stock,
-            soldQty,
-            lowStockThreshold: def.lowStockThreshold ?? 5,
-            imageUrl: img(`${def.name} ${color.name}`),
-            // Per-unit truth. Defaults to NEW; second-hand defs carry `unit`.
-            condition: def.unit?.condition ?? ProductCondition.NEW,
-            batteryHealth: def.unit?.batteryHealth ?? null,
-            conditionNote: def.unit?.conditionNote ?? null,
-            productId: product.id,
+            variantId: variant.id,
+            type: InventoryTxnType.RESTOCK,
+            previousStock: 0,
+            quantityChanged: row.stock,
+            newStock: row.stock,
+            reason: 'Initial stock (seed)',
+            adminId: admin.id,
           },
         });
-        variantCount++;
-        variantsBySku.set(sku, {
-          id: variant.id,
-          productName: def.name,
-          color: color.name,
-          storage: storage.label,
-          price: money(storage.price),
-        });
-
-        // The opening balance is itself a ledger entry: stock never appears
-        // out of thin air.
-        if (stock > 0) {
-          await prisma.inventoryTransaction.create({
-            data: {
-              variantId: variant.id,
-              type: InventoryTxnType.RESTOCK,
-              previousStock: 0,
-              quantityChanged: stock,
-              newStock: stock,
-              reason: 'Initial stock (seed)',
-              adminId: admin.id,
-            },
-          });
-        }
       }
     }
   }
@@ -587,7 +508,7 @@ async function main() {
         province: 'Metro Manila',
         postalCode: '1108',
       },
-      lines: [{ sku: 'IP15PM-256-NT', qty: 1 }],
+      lines: [{ sku: 'IP15PM-256-STD', qty: 1 }],
       method: PaymentMethod.GCASH,
       paymentStatus: PaymentStatus.PAID,
       orderStatus: OrderStatus.DELIVERED,
@@ -607,7 +528,7 @@ async function main() {
         postalCode: '1550',
       },
       lines: [
-        { sku: 'IP15-128-BLK', qty: 1 },
+        { sku: 'IP15-128-STD', qty: 1 },
         { sku: 'APP2-Standard-WHT', qty: 1 },
       ],
       method: PaymentMethod.GCASH,
@@ -628,7 +549,7 @@ async function main() {
         province: 'Metro Manila',
         postalCode: '1210',
       },
-      lines: [{ sku: 'IP14-128-MID', qty: 1 }],
+      lines: [{ sku: 'IP14-128-STD', qty: 1 }],
       method: PaymentMethod.COD,
       paymentStatus: PaymentStatus.PENDING,
       orderStatus: OrderStatus.RECEIVED,
@@ -644,6 +565,7 @@ async function main() {
       const items = so.lines.map((line) => {
         const v = variantsBySku.get(line.sku);
         if (!v) throw new Error(`Sample order references unknown SKU ${line.sku}`);
+        // Orders always charge the CASH price, never the installment base.
         const lineTotal = v.price.mul(line.qty);
         return {
           variantId: v.id,
@@ -790,8 +712,10 @@ async function main() {
     const v = variantsBySku.get(p.sku);
     if (!v) throw new Error(`Demo installment references unknown SKU ${p.sku}`);
 
+    // A plan divides the INSTALLMENT base price, not the cash price.
+    const financedPrice = v.installmentPrice ?? v.price;
     const downPayment = money(p.downPayment);
-    const { principal, monthlyAmount, rows } = computeSchedule(v.price, p.termMonths, downPayment);
+    const { principal, monthlyAmount, rows } = computeSchedule(financedPrice, p.termMonths, downPayment);
     const reference = `INS-${yyyymmdd(appliedAt)}-${String(p.seq).padStart(4, '0')}`;
 
     await prisma.installmentPlan.create({
@@ -804,7 +728,7 @@ async function main() {
         // plan's price must not.
         productName: v.productName,
         variantLabel: `${v.storage} · ${v.color}`,
-        productPrice: v.price,
+        productPrice: financedPrice,
         variantId: v.id,
         branchId: branches.get(p.branchSlug) ?? null,
         termMonths: p.termMonths,
@@ -847,14 +771,14 @@ async function main() {
         type: NotificationType.LOW_STOCK,
         level: NotificationLevel.WARNING,
         title: 'Low stock',
-        message: 'iPhone 13 mini (128GB · Midnight) is running low (3 left).',
+        message: 'iPhone 16 (256GB · Standard) is running low (1 left).',
         entityType: 'ProductVariant',
       },
       {
         type: NotificationType.OUT_OF_STOCK,
         level: NotificationLevel.ERROR,
         title: 'Out of stock',
-        message: 'iPhone SE (64GB · Starlight) is out of stock.',
+        message: 'iPhone 17 Air (256GB · Standard) is out of stock.',
         entityType: 'ProductVariant',
       },
       {

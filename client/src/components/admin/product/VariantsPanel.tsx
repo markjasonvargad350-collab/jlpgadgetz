@@ -7,7 +7,7 @@ import { Field, Input, Select, Textarea } from '../ui/Field';
 import { Modal } from '../ui/Modal';
 import { Spinner } from '../ui/Spinner';
 import { Badge } from '../ui/StatusBadge';
-import { AdjustStockModal } from '../AdjustStockModal';
+import { AdjustStockModal, AdjustPermissionNote } from '../AdjustStockModal';
 import type { AdjustTarget } from '../AdjustStockModal';
 import { CONDITION_LABELS, CONDITION_ORDER, isPreOwnedCondition } from '../../../config/condition';
 import { formatPHP } from '../../../utils/format';
@@ -22,6 +22,8 @@ interface VariantFormState {
   color: string;
   colorHex: string;
   price: string;
+  /** Blank = no separate installment base; plans divide the cash price instead. */
+  installmentPrice: string;
   /** Part of the variant's uniqueness — NEW and PREOWNED "256GB · Black" coexist. */
   condition: ProductCondition;
   /** Blank = not recorded. Only meaningful on units that aren't sealed-new. */
@@ -40,6 +42,7 @@ function toFormState(v: AdminVariant | null): VariantFormState {
     color: v?.color ?? '',
     colorHex: v?.colorHex ?? '',
     price: v ? String(v.price) : '',
+    installmentPrice: v?.installmentPrice != null ? String(v.installmentPrice) : '',
     condition: v?.condition ?? 'NEW',
     batteryHealth: v?.batteryHealth != null ? String(v.batteryHealth) : '',
     conditionNote: v?.conditionNote ?? '',
@@ -54,8 +57,9 @@ function toFormState(v: AdminVariant | null): VariantFormState {
  * Add/edit form for a single variant. On **create** the opening stock is booked
  * through the inventory ledger server-side (`initialStock`); on **edit** stock is
  * never touched here — it moves only via "Adjust stock". Mirrors the server
- * validators (SKU/storage/color required, positive price, optional 6-hex color,
- * battery health 0–100, condition note ≤ 500 chars).
+ * validators (SKU/storage/color required, positive price, optional positive
+ * installment base, optional 6-hex color, battery health 0–100, condition note
+ * ≤ 500 chars).
  */
 function VariantFormModal({
   productId,
@@ -71,6 +75,7 @@ function VariantFormModal({
   onSaved: () => void;
 }) {
   const isEdit = editing !== null;
+  const { isAdmin } = useAdminAuth();
   const [form, setForm] = useState<VariantFormState>(() => toFormState(editing));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +97,14 @@ function VariantFormModal({
     if (!form.storage.trim()) return 'Storage is required.';
     if (!form.color.trim()) return 'Color is required.';
     const price = Number(form.price);
-    if (!Number.isFinite(price) || price <= 0) return 'Enter a price greater than zero.';
+    if (!Number.isFinite(price) || price <= 0) return 'Enter a cash price greater than zero.';
+    // Blank is legitimate (finance at cash); a filled-in figure must be real money.
+    if (form.installmentPrice.trim()) {
+      const base = Number(form.installmentPrice);
+      if (!Number.isFinite(base) || base <= 0) {
+        return 'Enter an installment base price greater than zero, or leave it blank.';
+      }
+    }
     if (form.colorHex.trim() && !HEX_RE.test(form.colorHex.trim())) return 'Color hex must look like #1a2b3c.';
     if (form.batteryHealth.trim()) {
       const battery = Number(form.batteryHealth);
@@ -117,6 +129,7 @@ function VariantFormModal({
     const img = form.imageUrl.trim();
     const battery = form.batteryHealth.trim();
     const note = form.conditionNote.trim();
+    const instBase = form.installmentPrice.trim();
     try {
       if (isEdit) {
         const input: VariantUpdateInput = {
@@ -125,6 +138,8 @@ function VariantFormModal({
           color: form.color.trim(),
           colorHex: hex || null,
           price: Number(form.price),
+          // Cleared on purpose → null, which the server reads as "finance at cash".
+          installmentPrice: instBase ? Number(instBase) : null,
           condition: form.condition,
           batteryHealth: battery ? Number(battery) : null,
           conditionNote: note || null,
@@ -140,6 +155,7 @@ function VariantFormModal({
           color: form.color.trim(),
           colorHex: hex || undefined,
           price: Number(form.price),
+          installmentPrice: instBase ? Number(instBase) : undefined,
           condition: form.condition,
           batteryHealth: battery ? Number(battery) : undefined,
           conditionNote: note || undefined,
@@ -187,11 +203,8 @@ function VariantFormModal({
       }
     >
       <form id="variant-form" onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-        <Field label="SKU" htmlFor="v-sku">
-          <Input id="v-sku" value={form.sku} onChange={(e) => patch({ sku: e.target.value })} placeholder="IP16P-256-NT" />
-        </Field>
-        <Field label="Price (₱)" htmlFor="v-price">
-          <Input id="v-price" type="number" min={0} step="0.01" value={form.price} onChange={(e) => patch({ price: e.target.value })} placeholder="89990" />
+        <Field label="SKU" htmlFor="v-sku" hint="Ending it with the condition keeps options apart: -NEW / -STD / -PRE.">
+          <Input id="v-sku" value={form.sku} onChange={(e) => patch({ sku: e.target.value })} placeholder="IP16P-256-STD" />
         </Field>
         <Field label="Storage" htmlFor="v-storage">
           <Input id="v-storage" value={form.storage} onChange={(e) => patch({ storage: e.target.value })} placeholder="256GB" />
@@ -206,6 +219,30 @@ function VariantFormModal({
             <Input id="v-hex" value={form.colorHex} onChange={(e) => patch({ colorHex: e.target.value })} placeholder="#c9c2b8" />
           </div>
         </Field>
+
+        {/* Two prices, side by side so they're never confused: the cash price is
+            what checkout charges, the installment base is what a plan divides. */}
+        <div className="grid gap-4 rounded-2xl bg-white/50 p-4 sm:col-span-2 sm:grid-cols-2">
+          <Field label="Cash price (₱)" htmlFor="v-price" hint="What a buyer pays outright.">
+            <Input id="v-price" type="number" min={0} step="0.01" value={form.price} onChange={(e) => patch({ price: e.target.value })} placeholder="89990" />
+          </Field>
+          <Field
+            label="Installment base price (₱)"
+            htmlFor="v-inst-price"
+            hint="Optional — leave blank to finance at the cash price. Usually higher than cash."
+          >
+            <Input
+              id="v-inst-price"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.installmentPrice}
+              onChange={(e) => patch({ installmentPrice: e.target.value })}
+              placeholder="94990"
+            />
+          </Field>
+        </div>
+
         <Field label="Low-stock threshold" htmlFor="v-low" hint="Flag as low at or below this.">
           <Input id="v-low" type="number" min={0} step={1} value={form.lowStockThreshold} onChange={(e) => patch({ lowStockThreshold: e.target.value })} />
         </Field>
@@ -216,7 +253,7 @@ function VariantFormModal({
           </Field>
         )}
 
-        <div className={isEdit ? 'sm:col-span-2' : ''}>
+        <div className={isEdit ? '' : 'sm:col-span-2'}>
           <Field label="Image URL" htmlFor="v-img" hint="Optional per-variant image.">
             <Input id="v-img" value={form.imageUrl} onChange={(e) => patch({ imageUrl: e.target.value })} placeholder="https://placehold.co/800x800" />
           </Field>
@@ -299,7 +336,15 @@ function VariantFormModal({
 
         {isEdit && (
           <p className="sm:col-span-2 text-xs text-ink-soft">
-            Stock isn’t editable here — it moves only through the inventory ledger. Use <span className="font-semibold text-ink">Adjust stock</span> on the variant row.
+            Stock isn’t editable here — it moves only through the inventory ledger.{' '}
+            {isAdmin ? (
+              <>
+                Use <span className="font-semibold text-ink">Adjust stock</span> on the variant row.
+              </>
+            ) : (
+              // Don't point a STAFF account at a button that's hidden for them.
+              <>An ADMIN can move it from the variant row or Inventory → Adjust.</>
+            )}
           </p>
         )}
 
@@ -321,7 +366,7 @@ export function VariantsPanel({
   variants: AdminVariant[];
   onChanged: () => void;
 }) {
-  const { isAdmin } = useAdminAuth();
+  const { admin, isAdmin } = useAdminAuth();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminVariant | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<AdjustTarget | null>(null);
@@ -363,6 +408,8 @@ export function VariantsPanel({
         </button>
       </div>
 
+      {!isAdmin && <AdjustPermissionNote role={admin?.role ?? null} className="mt-4" />}
+
       {variants.length > 0 ? (
         <ul className="mt-4 flex flex-col gap-2">
           {variants.map((v) => (
@@ -389,6 +436,11 @@ export function VariantsPanel({
               <div className="flex items-center gap-4 sm:gap-6">
                 <div className="text-right">
                   <p className="font-display font-bold text-ink">{formatPHP(v.price)}</p>
+                  {/* Only when it differs — a blank installment base means plans
+                      divide the cash figure already shown above. */}
+                  {v.installmentPrice != null && v.installmentPrice !== v.price && (
+                    <p className="text-[11px] text-ink-soft">{formatPHP(v.installmentPrice)} installment</p>
+                  )}
                   <p className="text-xs text-ink-soft">
                     <span className={v.stock <= 0 ? 'font-semibold text-coral' : 'font-semibold text-ink'}>{v.stock}</span> on hand
                     {v.reservedStock > 0 && <> · {v.reservedStock} held</>}

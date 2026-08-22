@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
 const statusEnum = z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED']);
-const conditionEnum = z.enum(['NEW', 'OPEN_BOX', 'PREOWNED', 'REFURBISHED']);
+const conditionEnum = z.enum(['NEW', 'STANDARD', 'OPEN_BOX', 'PREOWNED', 'REFURBISHED']);
 const hexColor = z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, 'Use a #RRGGBB hex color');
 // Battery health only makes sense for pre-owned/refurbished units (0–100%).
 const batteryHealthField = z.number().int().min(0).max(100);
+// Installment BASE price — the figure a plan divides, which the shop sets higher
+// than cash. Nullable: cleared / omitted means "finance this option at its cash
+// price" (see installment.service.ts).
+const installmentPriceField = z.number().positive().max(100_000_000).nullable();
 
 export const imageInputSchema = z.object({
   url: z.string().trim().min(1).max(1000),
@@ -18,6 +22,7 @@ export const variantCreateSchema = z.object({
   color: z.string().trim().min(1).max(60),
   colorHex: hexColor.optional(),
   price: z.number().positive().max(100_000_000),
+  installmentPrice: installmentPriceField.optional(),
   initialStock: z.number().int().min(0).max(1_000_000).optional(),
   lowStockThreshold: z.number().int().min(0).max(100_000).optional(),
   imageUrl: z.string().trim().max(1000).optional(),
@@ -84,6 +89,7 @@ export const variantUpdateSchema = z
     color: z.string().trim().min(1).max(60).optional(),
     colorHex: hexColor.nullable().optional(),
     price: z.number().positive().max(100_000_000).optional(),
+    installmentPrice: installmentPriceField.optional(),
     lowStockThreshold: z.number().int().min(0).max(100_000).optional(),
     imageUrl: z.string().trim().max(1000).nullable().optional(),
     isActive: z.boolean().optional(),

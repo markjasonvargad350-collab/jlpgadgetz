@@ -26,7 +26,7 @@ CREATE TYPE "NotificationType" AS ENUM ('NEW_ORDER', 'LOW_STOCK', 'OUT_OF_STOCK'
 CREATE TYPE "NotificationLevel" AS ENUM ('INFO', 'SUCCESS', 'WARNING', 'ERROR');
 
 -- CreateEnum
-CREATE TYPE "ProductCondition" AS ENUM ('NEW', 'OPEN_BOX', 'PREOWNED', 'REFURBISHED');
+CREATE TYPE "ProductCondition" AS ENUM ('NEW', 'STANDARD', 'OPEN_BOX', 'PREOWNED', 'REFURBISHED');
 
 -- CreateEnum
 CREATE TYPE "TradeInStatus" AS ENUM ('SUBMITTED', 'REVIEWING', 'QUOTED', 'ACCEPTED', 'DECLINED', 'COMPLETED', 'CANCELLED');
@@ -125,6 +125,7 @@ CREATE TABLE "ProductVariant" (
     "color" TEXT NOT NULL,
     "colorHex" TEXT,
     "price" DECIMAL(12,2) NOT NULL,
+    "installmentPrice" DECIMAL(12,2),
     "stock" INTEGER NOT NULL DEFAULT 0,
     "reservedStock" INTEGER NOT NULL DEFAULT 0,
     "soldQty" INTEGER NOT NULL DEFAULT 0,

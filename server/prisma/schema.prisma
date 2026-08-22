@@ -92,6 +92,7 @@ enum NotificationLevel {
 // pre-owned/refurbished units). Defaults to NEW so existing rows are unaffected.
 enum ProductCondition {
   NEW // brand new, sealed
+  STANDARD // shop-standard unit: tested in store, not sealed-new
   OPEN_BOX // opened, unused
   PREOWNED // used / second-hand
   REFURBISHED // professionally restored
@@ -246,12 +247,19 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id                String  @id @default(cuid())
-  sku               String  @unique // stock-keeping unit
-  storage           String // e.g. "128GB", "256GB", "1TB"
-  color             String // e.g. "Natural Titanium"
-  colorHex          String? // swatch color, e.g. "#8A8A8D"
-  price             Decimal @db.Decimal(12, 2)
+  id       String  @id @default(cuid())
+  sku      String  @unique // stock-keeping unit
+  storage  String // e.g. "128GB", "256GB", "1TB"
+  color    String // e.g. "Natural Titanium"
+  colorHex String? // swatch color, e.g. "#8A8A8D"
+  /// Cash price — what a customer pays outright. Authoritative for cart/checkout.
+  price    Decimal @db.Decimal(12, 2)
+
+  /// Base price used ONLY for installment plans, which JLP prices higher than
+  /// cash. NULL = this variant is financed at its cash `price`, so accessories
+  /// and every pre-existing row keep behaving exactly as before.
+  installmentPrice Decimal? @db.Decimal(12, 2)
+
   stock             Int     @default(0) // on-hand, sellable
   reservedStock     Int     @default(0) // held by in-flight orders
   soldQty           Int     @default(0) // lifetime units sold (for best-seller sort)

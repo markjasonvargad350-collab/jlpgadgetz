@@ -19,6 +19,12 @@ const phoneField = z
 
 const batteryHealthField = z.number().int().min(0).max(100);
 
+// A customer grades THEIR OWN phone here, so the shop's internal "Standard"
+// grading tier is deliberately not on offer — it describes a unit JLP has tested
+// and put on the shelf, which is not a thing a seller can claim about their own
+// device. Kept derived from the Prisma enum so a rename fails the build.
+const deviceConditionField = z.enum(ProductCondition).exclude(['STANDARD']);
+
 // ── Public application ───────────────────────────────────────────────────────
 
 export const createTradeInSchema = z.object({
@@ -32,7 +38,7 @@ export const createTradeInSchema = z.object({
     model: z.string().trim().min(1, 'Device model is required').max(80),
     storage: z.string().trim().max(40).optional(),
     color: z.string().trim().max(60).optional(),
-    condition: z.enum(ProductCondition).optional(), // defaults to PREOWNED server-side
+    condition: deviceConditionField.optional(), // defaults to PREOWNED server-side
     batteryHealth: batteryHealthField.optional(),
     imei: z.string().trim().max(20).optional(),
     hasBox: z.boolean().optional(),

@@ -22,7 +22,7 @@ panel** in a browser — no code, no developer needed.
 5. [Turn on installments for a product](#5-turn-on-installments-for-a-product)
 6. [Stock — how quantities work](#6-stock--how-quantities-work)
 7. [Photos](#7-photos)
-8. [Retire the sample (demo) products](#8-retire-the-sample-demo-products)
+8. [Your catalogue and the old sample products](#8-your-catalogue-and-the-old-sample-products)
 9. [Day-to-day: trade-ins & installments](#9-day-to-day-trade-ins--installments)
 10. [What needs a developer](#10-what-needs-a-developer)
 11. [Quick checklist](#quick-checklist)
@@ -51,7 +51,10 @@ There are two kinds of staff login:
 
 - **ADMIN** — can do everything (change stock, delete products, delete branches).
 - **STAFF** — can do the day-to-day work but **cannot** adjust stock or delete
-  things. Stock buttons simply won't appear for them.
+  things. Those buttons don't appear for them; where a stock button would be,
+  they see a short note saying an ADMIN sign-in is needed.
+
+Your own role is shown in the sidebar, under your name.
 
 ---
 
@@ -105,7 +108,7 @@ Sidebar → **Products** → **New product** (top right).
 | **Status** | `Draft` for now | Switch to **Active** when it's ready to sell |
 | **Brand** | `Apple` | Change for other brands |
 | **Model** | `iPhone 13` | Optional |
-| **Base price (₱)** | `28000` | The "from" price shown on the card |
+| **Base price (₱)** | `28000` | The cash "from" price shown on the card |
 | **Discount %** | `0` | Shows a struck-through price if above 0 |
 | **Release year** | `2021` | Optional |
 | **Description** | A few honest sentences | Required |
@@ -129,10 +132,11 @@ In the **Variants** card → **Add variant**:
 | Field | Example | Notes |
 |---|---|---|
 | **SKU** | `IP13-128-MID-NEW` | Your own code. Must be unique across the shop |
-| **Price (₱)** | `28000` | What the customer actually pays |
 | **Storage** | `128GB` | |
-| **Color** | `Midnight` | |
+| **Color** | `Midnight` | Use `Assorted` if you don't sort your stock by colour |
 | **Color hex** | `#1B1B1F` | Optional — draws the little colour dot |
+| **Cash price (₱)** | `28000` | What a customer pays to buy it outright |
+| **Installment base price (₱)** | `31000` | Optional. The higher price a monthly plan divides — leave blank to use the cash price |
 | **Low-stock threshold** | `2` | Flags the variant as "Low" at or below this |
 | **Opening stock** | `3` | How many you have right now |
 | **Image URL** | *(optional)* | A photo for this exact colour |
@@ -140,6 +144,15 @@ In the **Variants** card → **Add variant**:
 | **Active — sellable** | on | Off = hidden from the store |
 
 **Add variant**, then repeat for every storage/colour you stock.
+
+> **The two prices.** *Cash price* is what checkout charges and what the store
+> shows on the card and product page. *Installment base price* is the figure a
+> monthly plan is divided from — normally a bit higher, because a plan is paid
+> over time. Fill in both if you price them differently; leave the installment
+> box empty and monthly plans simply use the cash price. Every option's two
+> prices are shown side by side on the variant list, and the store never mixes
+> them up: the cart always charges cash, the Installment page always quotes from
+> the installment base ([§5](#5-turn-on-installments-for-a-product)).
 
 ### Step 3 — Publish
 
@@ -155,7 +168,7 @@ There are **two separate switches**, and they do different jobs:
 | | Where | What it does |
 |---|---|---|
 | **“Pre-owned” flag** | Product → **Details** → Flags | Labels the **whole listing** second-hand: a *Pre-owned* badge on the card and product page, a place in the homepage **Pre-owned** row, and inclusion in the store's *Pre-owned only* filter |
-| **Condition box** | Product → **Variants** → each variant | The truth about **one specific unit**: Brand new / Open box / Refurbished / Pre-owned, plus battery health and a condition note |
+| **Condition box** | Product → **Variants** → each variant | The truth about **one specific unit**: Brand new / Standard / Open box / Refurbished / Pre-owned, plus battery health and a condition note |
 
 Rule of thumb:
 
@@ -167,7 +180,15 @@ Rule of thumb:
 
 ### The variant's Condition box
 
-Options: **Brand new**, **Open box**, **Refurbished**, **Pre-owned**.
+Options, best-first:
+
+| Condition | Use it for |
+|---|---|
+| **Brand new** | Sealed, never opened |
+| **Standard** | Your standard shelf unit — opened and tested by you, not sealed-new. This is the tier most of your price list sits in |
+| **Open box** | Sealed unit that was opened but never really used |
+| **Refurbished** | Repaired/reconditioned before resale |
+| **Pre-owned** | Second-hand, previously used by someone else |
 
 Pick anything other than *Brand new* and two extra fields appear:
 
@@ -179,17 +200,23 @@ Pick anything other than *Brand new* and two extra fields appear:
 Customers see the condition as a badge on the product card and the battery
 health on the product page.
 
+> *Standard* is your own grading, so it appears in the admin form and on the
+> store — but **not** on the customer's trade-in form. Someone describing their
+> own phone can't claim a tier that means "JLP has tested this unit".
+
 ### The same phone, new *and* pre-owned
 
-Condition is part of a variant's identity, so **`128GB · Midnight · Brand new`**
-and **`128GB · Midnight · Pre-owned`** can both exist on the same product, at
-different prices and with separate stock. Give them different SKUs
-(`…-NEW` / `…-USED`) and you're done.
+Condition is part of a variant's identity, so **`128GB · Standard`** and
+**`128GB · Brand new`** can both exist on the same product, at different prices
+and with separate stock. That's exactly how your catalogue is already set up —
+e.g. the iPhone 14 page carries `IP14-128-STD` at ₱24,990 and `IP14-128-NEW` at
+₱33,990, and the customer picks between them. Ending the SKU with the condition
+(`…-STD`, `…-NEW`, `…-PRE`) keeps them easy to tell apart.
 
 Two ways to organise pre-owned stock — either is fine:
 
 1. **Same product, extra variants** — good when it's the same model, e.g. an
-   iPhone 13 page with new *and* pre-owned units.
+   iPhone 14 page with standard *and* brand-new units.
 2. **A separate product** — good when the unit is one-of-a-kind. Name it
    plainly, e.g. `iPhone 11 (Pre-owned)`, and give it one variant with
    `Opening stock = 1`.
@@ -201,8 +228,9 @@ Two ways to organise pre-owned stock — either is fine:
 In **Details** → **Installment**:
 
 1. Press the toggle so it reads **Installment allowed**.
-2. Optionally set **Minimum down payment %** (0–90). `0` = no down payment
-   required.
+2. Optionally set **Minimum down payment %** (0–90) — a percentage of the
+   installment base price. `0` = no down payment required. Your catalogue is set
+   to `20` on every phone.
 3. **Save changes**.
 
 That product now appears on the store's **Installment** page, where the customer
@@ -211,19 +239,23 @@ picks a term of **3, 6, 9 or 12 months**.
 **How the monthly amount is worked out — nothing else is added:**
 
 ```
-principal = price − down payment
+principal = installment base price − down payment
 monthly   = principal ÷ number of months
 ```
 
-No interest, no service fee, no financing charge. Example — ₱28,000 phone, 20%
-down, 6 months:
+The figure divided is the variant's **installment base price**, not its cash
+price (see [§3](#step-2--add-at-least-one-variant)). If a variant has no
+installment price of its own, its cash price is used instead.
+
+No interest, no service fee, no financing charge. Example — a Standard iPhone 14
+at ₱24,990 cash / **₱27,990 installment**, 20% down, 6 months:
 
 ```
-down payment = ₱5,600      principal = ₱22,400      monthly = ₱3,733.33
+down payment = ₱5,598      principal = ₱22,392      monthly = ₱3,732
 ```
 
 The last month absorbs any centavo rounding, so the 6 monthly amounts add up to
-exactly ₱22,400.
+exactly ₱22,392.
 
 The store shows the figure for information only — the amounts are always
 recalculated on the server from the price in your catalogue when the customer
@@ -231,8 +263,8 @@ applies, so a customer can't tamper with them.
 
 Also worth knowing:
 
-- The price is **frozen into the application** at the moment the customer
-  applies. Re-pricing the product later never changes an existing plan.
+- The installment base price is **frozen into the application** at the moment the
+  customer applies. Re-pricing the product later never changes an existing plan.
 - Applications arrive as **Pending**. Nothing is auto-approved — you approve
   every plan yourself (see [§9](#9-day-to-day-trade-ins--installments)).
 - If no product has installments enabled, the Installment page tells customers
@@ -254,6 +286,13 @@ a branch is the customer's preferred pickup/contact shop, nothing more.
   under **Inventory**.
 - The **Edit variant** form deliberately has no stock box — that's why.
 - Online orders deduct stock automatically when the order is placed.
+
+> **No "Adjust" button?** Then you're signed in as **STAFF** — check the role
+> under your name in the sidebar. Stock can only be moved by an ADMIN, and no
+> screen in the back office can hand out that role, so it has to be granted from
+> outside the app. Ask your developer to run `npm run admin:doctor`, which lists
+> every account and says which of them can change stock (see
+> [DEPLOYMENT.md → Going live: clean slate](DEPLOYMENT.md#going-live-clean-slate)).
 
 ---
 
@@ -277,18 +316,48 @@ box.
 
 ---
 
-## 8. Retire the sample (demo) products
+## 8. Your catalogue and the old sample products
 
-The store shipped with 15 sample items (10 iPhones plus a few accessories) so the
-pages weren't empty. Once your real products are in:
+Your real price list — **26 listings / 48 sellable options** across *Pre-owned*,
+*Standard* and *Brand new* — is already loaded, so there are no sample phones
+left to clean up:
 
-1. **Products** → open a sample product.
-2. Set **Status → Archived — hidden, kept for history** → **Save changes**.
+- The 8 sample iPhones that matched a model you actually sell were **rewritten**
+  into the real thing: same page, real prices, real condition tiers.
+- The 3 with no counterpart (iPhone 13 mini, iPhone SE 3rd gen and the demo
+  *iPhone 12 (Pre-loved)* listing) are already **Archived** — gone from the
+  store, history intact.
+- Leftover demo options on the rewritten pages are set to **Inactive** with 0
+  stock. They stay in the Variants card so old orders still make sense; just
+  ignore them.
+- **Your accessories were not touched** — AirPods Pro 2, AirPods 3, the 20W
+  adapter, the MagSafe charger and the silicone case keep their prices, stock,
+  variants and photos exactly as they were.
 
-Archived products vanish from the store but keep their history. **Delete** is
-blocked for anything with stock or sales history (you'll see *"This product has
-inventory or sales history and cannot be deleted. Archive it instead."*) — that's
-the safety net protecting your records. Archiving is the right move.
+Two things to finish yourself:
+
+1. **iPhone 11 Pro is a Draft.** Your price list had no figure for it, so it was
+   created unpublished with a ₱0 inactive option — nothing a customer can see.
+   Type the real cash and installment prices on the variant, tick **Active —
+   sellable**, then set **Status → Active** in Details.
+2. **Check every quantity.** Opening stock was a placeholder: **1** for
+   pre-owned units, **3** for standard and brand-new ones. Fix them from
+   **Inventory** or the **Adjust** button on each variant row — the *Set to
+   value* tab is the quickest after a stock-take.
+
+To hide any listing later: **Status → Archived — hidden, kept for history** →
+**Save changes**. Archived products vanish from the store but keep their history.
+**Delete** is blocked for anything with stock or sales history (you'll see *"This
+product has inventory or sales history and cannot be deleted. Archive it
+instead."*) — that's the safety net protecting your records. Archiving is the
+right move.
+
+> **If a developer ever re-loads the catalogue.** Those 26 listings also exist in
+> code (`server/prisma/catalog-defs.ts`), and re-running `npm run catalog:sync`
+> resets their names, descriptions, flags and **both prices** back to that file.
+> It never touches stock, photos or your accessories, and it never deletes
+> anything. So if you change a price here in admin, tell them to update that file
+> too — otherwise the next run puts the old price back.
 
 ---
 
@@ -346,31 +415,48 @@ Pending → Approved → Active → Completed
 
 ## 10. What needs a developer
 
-Everything else in this guide you control. These two are in code:
+Everything else in this guide you control. These are in code:
 
-1. **The category list** — currently *iPhone*, *AirPods*, *Chargers & Cables*,
-   *Cases & Protection*. If you start selling Samsung, Xiaomi, laptops, etc.
-   and want a proper category for them, that's a small code change. Until then,
-   file them under the closest existing category — the product name and brand
-   still show correctly.
+1. **The category list** — currently *iPhone*, *iPad*, *AirPods*, *Chargers &
+   Cables*, *Cases & Protection*. If you start selling Samsung, Xiaomi, laptops,
+   etc. and want a proper category for them, that's a small code change. Until
+   then, file them under the closest existing category — the product name and
+   brand still show correctly.
 2. **The installment terms** — fixed at 3, 6, 9 and 12 months, interest-free.
    Changing the available terms is a code change.
+3. **Who is an ADMIN** — granting the role that can change stock (see [§6](#6-stock--how-quantities-work)).
+4. **Clearing the test orders** before you open for real. There's no button for
+   this — orders are permanent records on purpose. A developer runs
+   `npm run reset:transactions`, which deletes the practice orders and their
+   payments/shipments but **keeps your stock counts**, leaving one *"Opening
+   balance"* line per option in the Inventory history. Prices, photos,
+   accessories, branches and logins are untouched. Do it **after** you've set the
+   real quantities, not before.
 
 ---
 
 ## Quick checklist
 
-Setting the shop up for the first time:
+Setting the shop up for the first time — your price list is already loaded, so
+this is mostly checking and finishing:
 
 - [ ] Sign in at `/admin/login`
 - [ ] **Branches** — create Passi (main), Kalibo, Sara
-- [ ] **Products** — add each real phone: Details → Create → Images → Variants
-- [ ] Every variant has SKU, price, storage, color, **condition** and opening stock
+- [ ] **Inventory** — correct the placeholder quantities (1 pre-owned / 3 standard
+      and new) on every option
+- [ ] **iPhone 11 Pro** — type its two prices, tick the variant *Active*, set
+      Status → Active ([§8](#8-your-catalogue-and-the-old-sample-products))
+- [ ] **Photos** — swap the placeholder images for your own ([§7](#7-photos))
+- [ ] Check the storage labels and colours match what you really stock (colours
+      are all `Assorted` until you split them)
+- [ ] Adding something new? Details → Create → Images → Variants — every variant
+      needs a SKU, **cash price**, storage, colour, **condition** and opening
+      stock, plus the **installment base price** if it differs
 - [ ] Pre-owned units have battery health + an honest condition note
 - [ ] Second-hand-only listings have the **Pre-owned** flag ticked in Details
-- [ ] Installment toggle on for the phones you'll offer monthly
+- [ ] Installments are already on for all 26 listings at 20% minimum down — change
+      any you don't want to offer monthly
 - [ ] Product **Status = Active** for everything ready to sell
-- [ ] Archive the 15 sample products
 - [ ] Open the store and check a product page, the Installment page and About
 
 Then, day to day: **Orders** for online sales, **Trade-ins** for phones coming

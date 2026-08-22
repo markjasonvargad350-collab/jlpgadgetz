@@ -53,7 +53,10 @@ export interface AdminVariant {
   storage: string;
   color: string;
   colorHex: string | null;
+  /** Cash price — what a customer pays to buy this option outright. */
   price: number;
+  /** Installment BASE price. Null = financed at the cash price. */
+  installmentPrice: number | null;
   stock: number;
   reservedStock: number;
   soldQty: number;
@@ -396,6 +399,8 @@ export interface VariantCreateInput {
   color: string;
   colorHex?: string;
   price: number;
+  /** Null / omitted = finance this option at its cash price. */
+  installmentPrice?: number | null;
   initialStock?: number;
   lowStockThreshold?: number;
   imageUrl?: string;
@@ -412,6 +417,7 @@ export interface VariantUpdateInput {
   color?: string;
   colorHex?: string | null;
   price?: number;
+  installmentPrice?: number | null;
   lowStockThreshold?: number;
   imageUrl?: string | null;
   isActive?: boolean;

@@ -57,6 +57,16 @@ function variantLabel(v: ProductVariant): string {
   return `${v.storage} · ${v.color} · ${CONDITION_LABELS[v.condition]}`;
 }
 
+/**
+ * What a plan actually divides: the option's installment base price, or its cash
+ * price when the shop hasn't set a separate one. Mirrors the server
+ * (`installment.service.ts` → `variant.installmentPrice ?? variant.price`), which
+ * has the last word on every figure here.
+ */
+function financedPrice(v: ProductVariant): number {
+  return v.installmentPrice ?? v.price;
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function InstallmentPage() {
@@ -114,7 +124,7 @@ export function InstallmentPage() {
   // enforces the real one either way (422 with the exact minimum).
   const downPaymentFloor = useMemo(() => {
     if (!product || !selectedVariant) return 0;
-    return minDownPayment(selectedVariant.price, product.installmentMinDownPct);
+    return minDownPayment(financedPrice(selectedVariant), product.installmentMinDownPct);
   }, [product, selectedVariant]);
 
   const downPayment = useMemo(() => {
@@ -196,7 +206,7 @@ export function InstallmentPage() {
 
     const found = validateContact(form);
     if (downPayment > 0 && downPayment >= quote.price) {
-      found.downPayment = 'Down payment must be less than the price.';
+      found.downPayment = 'Down payment must be less than the installment price.';
     }
     if (Object.keys(found).length > 0) {
       setErrors(found);
@@ -253,8 +263,11 @@ export function InstallmentPage() {
       <h1 className="font-display text-3xl font-extrabold sm:text-4xl">Installment plans</h1>
       <p className="mt-2 max-w-2xl text-ink-soft">
         Pay for your device monthly. The monthly amount is simply the{' '}
-        <strong className="font-semibold text-ink">price divided by the number of months</strong> — we don’t
-        add interest or service fees. Apply online and our staff will contact you to finalise it.
+        <strong className="font-semibold text-ink">
+          installment price divided by the number of months
+        </strong>{' '}
+        — we don’t add interest or service fees. Installment pricing sits a little above the cash price;
+        both are shown on every option below. Apply online and our staff will contact you to finalise it.
       </p>
 
       <form onSubmit={onSubmit} className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]" noValidate>
@@ -340,7 +353,7 @@ export function InstallmentPage() {
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-ink">{card.name}</span>
                           <span className="block text-xs text-ink-soft">
-                            from {formatPHP(card.priceFrom)}
+                            installment from {formatPHP(card.installmentPriceFrom ?? card.priceFrom)}
                           </span>
                         </span>
                       </button>
@@ -357,7 +370,7 @@ export function InstallmentPage() {
                 <p className="mt-0.5 text-xs text-ink-soft">
                   Minimum down payment:{' '}
                   {product.installmentMinDownPct > 0
-                    ? `${product.installmentMinDownPct}% of the price`
+                    ? `${product.installmentMinDownPct}% of the installment price`
                     : 'none'}
                 </p>
 
@@ -402,7 +415,14 @@ export function InstallmentPage() {
                             )}
                           </span>
                         </span>
-                        <span className="shrink-0 text-sm font-bold">{formatPHP(v.price)}</span>
+                        <span className="shrink-0 text-right text-sm">
+                          <span className="block font-bold">{formatPHP(financedPrice(v))}</span>
+                          {v.installmentPrice != null && v.installmentPrice !== v.price && (
+                            <span className="block text-[11px] font-medium text-ink-soft">
+                              {formatPHP(v.price)} cash
+                            </span>
+                          )}
+                        </span>
                       </label>
                     );
                   })}
@@ -415,7 +435,8 @@ export function InstallmentPage() {
               <div className="mt-4 rounded-2xl border border-white/60 bg-white/50 p-4">
                 <p className="font-semibold text-ink">{quote.productName}</p>
                 <p className="text-sm text-ink-soft">
-                  {quote.variantLabel} · {CONDITION_LABELS[quote.condition]} · {formatPHP(quote.price)}
+                  {quote.variantLabel} · {CONDITION_LABELS[quote.condition]} · {formatPHP(quote.price)} on
+                  installment
                 </p>
               </div>
             )}
@@ -433,7 +454,7 @@ export function InstallmentPage() {
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {INSTALLMENT_TERMS.map((term) => {
                 const active = term === termMonths;
-                const basePrice = selectedVariant?.price ?? quote?.price ?? 0;
+                const basePrice = (selectedVariant ? financedPrice(selectedVariant) : quote?.price) ?? 0;
                 // Preview only — the aside shows the server-confirmed figure.
                 const preview = basePrice ? computeMonthly(basePrice, term, downPayment) : 0;
                 return (
@@ -555,7 +576,7 @@ export function InstallmentPage() {
 
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-ink-soft">Price</dt>
+                  <dt className="text-ink-soft">Installment price</dt>
                   <dd className="font-semibold">{formatPHP(quote.price)}</dd>
                 </div>
                 <div className="flex justify-between">

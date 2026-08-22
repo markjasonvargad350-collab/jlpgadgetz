@@ -6,9 +6,10 @@
 //    • prisma/demo-data.ts  — additive + idempotent, safe against the live DB
 //  so the two can never disagree about what the demo data actually IS.
 //
-//  Everything in this file is DEMO data for presentations. The owner replaces it
-//  with real stock from Admin → Products (see docs/ADD-YOUR-PRODUCTS.md). All
-//  imagery is a placeholder — no copyrighted product photos.
+//  Scope: branches, the accessory def shape, and the demo APPLICATIONS that keep
+//  the back-office lists from being empty (trade-ins, installment plans). The
+//  product catalog itself is real and lives in ./catalog-defs — nothing here
+//  creates a phone. All imagery is a placeholder — no copyrighted product photos.
 // ============================================================================
 import { ProductCondition, TradeInStatus, InstallmentStatus } from '@prisma/client';
 
@@ -19,6 +20,11 @@ export const img = (text: string) =>
 export type Color = { name: string; hex: string; code: string };
 export type StorageDef = { label: string; price: number };
 
+/**
+ * An accessory listing: one price per size, cross-multiplied with colours. The
+ * phones and iPads use `CatalogProductDef` in ./catalog-defs instead, because a
+ * phone row carries a condition tier and a second (installment) price.
+ */
 export type ProductDef = {
   name: string;
   slug: string;
@@ -30,15 +36,6 @@ export type ProductDef = {
   skuBase: string;
   storages: StorageDef[];
   colors: Color[];
-  discountPct?: number;
-  /** Per-variant "Low" warning threshold. Defaults to 5 — one-off used stock wants 1. */
-  lowStockThreshold?: number;
-  /**
-   * Applied to every variant this def generates. Used for second-hand listings:
-   * the condition/battery/note here is the per-UNIT truth, while the listing-level
-   * `flags.isPreOwned` is what drives the storefront badge and Pre-owned rail.
-   */
-  unit?: { condition: ProductCondition; batteryHealth?: number; conditionNote?: string };
   flags?: Partial<{
     isFeatured: boolean;
     isNewArrival: boolean;
@@ -78,70 +75,12 @@ export const BRANCH_DEFS = [
   { name: 'Sara Branch', slug: 'sara', city: 'Sara', province: 'Iloilo', position: 3 },
 ];
 
-// ── Installment opt-ins ─────────────────────────────────────────────────────
-//
-// Product slug → smallest down payment staff will accept, as a percent of price.
-// Presence in this table is what flips `installmentAvailable`. The monthly amount
-// is ALWAYS price ÷ term, computed server-side — this percentage is not interest,
-// a service fee, or a financing charge, and there is none of either anywhere.
-//
-// Accessories are deliberately excluded: a ₱1,190 charger on a 12-month plan is
-// not a real offer.
-export const INSTALLMENT_MIN_DOWN_PCT: Record<string, number> = {
-  'iphone-15-pro-max': 20,
-  'iphone-15': 10,
-  'iphone-14': 0,
-  'iphone-13': 0,
-  'iphone-12-pre-loved': 20,
-};
-
-// ── Pre-owned demo listing ──────────────────────────────────────────────────
-//
-// Demonstrates both new features at once: the listing-level "Pre-owned" flag and
-// the installment application. Every unit detail is DEMO data.
-export const PRE_LOVED_DEMO: ProductDef = {
-  name: 'iPhone 12 (Pre-owned)',
-  slug: 'iphone-12-pre-loved',
-  model: 'iPhone 12',
-  categorySlug: 'iphone',
-  description:
-    'A second-hand iPhone 12, tested and cleaned in store before it goes on the shelf. Every unit is sold as-is with its condition and battery health written on the listing, so you know exactly what you are getting. Ask any branch to see the actual unit before you pay.',
-  highlights: [
-    '6.1" Super Retina XDR display',
-    'A14 Bionic',
-    'Fully tested in store',
-    'Condition and battery health disclosed',
-  ],
-  releaseYear: 2020,
-  skuBase: 'IP12PL',
-  // Second-hand stock is one-off: 1 unit left is normal, not a restock alarm.
-  lowStockThreshold: 1,
-  storages: [
-    { label: '64GB', price: 19990 },
-    { label: '128GB', price: 23990 },
-  ],
-  colors: [
-    { name: 'Black', hex: '#1F2020', code: 'BLK' },
-    { name: 'Blue', hex: '#1E4C6B', code: 'BLU' },
-  ],
-  unit: {
-    condition: ProductCondition.PREOWNED,
-    batteryHealth: 89,
-    conditionNote:
-      'Light hairline scratches on the frame, screen is clean. Comes with a charging cable only — no original box. Sold as-is; shop-tested before release.',
-  },
-  flags: { isPreOwned: true },
-};
-
-/** On-hand units per pre-owned SKU — second-hand stock is one-off, never 25. */
-export const PRE_LOVED_STOCK: Record<string, number> = {
-  'IP12PL-64-BLK': 1,
-  'IP12PL-64-BLU': 2,
-  'IP12PL-128-BLK': 2,
-  'IP12PL-128-BLU': 1,
-};
-
 // ── Demo applications (so the back-office lists aren't empty) ───────────────
+//
+// These are the ONLY demo records left: the catalog, its prices and its
+// installment opt-ins are real and come from ./catalog-defs. Nothing here
+// creates or re-creates a product, so `demo:data` can never put a dummy phone
+// back on the live store.
 
 export type TradeInDemo = {
   /** Sequence within its submission day — feeds the TRD-YYYYMMDD-#### reference. */
@@ -216,7 +155,7 @@ export type InstallmentDemo = {
   /** Sequence within its application day — feeds the INS-YYYYMMDD-#### reference. */
   seq: number;
   daysAgo: number;
-  /** Which catalog variant the customer applied for. */
+  /** Which catalog variant the customer applied for — a real SKU from ./catalog-defs. */
   sku: string;
   customerName: string;
   customerEmail: string;
@@ -231,17 +170,18 @@ export type InstallmentDemo = {
 };
 
 // Plan money is never hand-written: both consumers run these through
-// `computeSchedule` — the same function the API uses at apply time.
+// `computeSchedule` — the same function the API uses at apply time — against the
+// variant's INSTALLMENT base price, not its cash price.
 export const INSTALLMENT_DEMOS: InstallmentDemo[] = [
   {
     seq: 1,
     daysAgo: 3,
-    sku: 'IP15PM-256-NT',
+    sku: 'IP15PM-256-STD',
     customerName: 'Grace Villanueva',
     customerEmail: 'grace.villanueva@example.com',
     customerPhone: '+639173334455',
     branchSlug: 'passi',
-    // 9 months on a ₱69,990 principal doesn't divide evenly — a deliberate case
+    // A 9-month term on this principal doesn't divide evenly — a deliberate case
     // that shows the final schedule row absorbing the rounding remainder.
     termMonths: 9,
     downPayment: 20000,
@@ -252,7 +192,7 @@ export const INSTALLMENT_DEMOS: InstallmentDemo[] = [
   {
     seq: 2,
     daysAgo: 40,
-    sku: 'IP12PL-128-BLK',
+    sku: 'IP12-128-PRE',
     customerName: 'Mark Anthony Salazar',
     customerEmail: 'mark.salazar@example.com',
     customerPhone: '+639184445566',

@@ -9,9 +9,12 @@
 //
 //  What it does — all definitions come from ./demo-defs, shared with the seed:
 //    1. Branches      — creates any of the 3 JLP branches that don't exist yet.
-//    2. Installments  — turns the opt-in ON for the products in the shared table.
-//    3. Pre-owned     — adds the "iPhone 12 (Pre-owned)" listing + its variants.
-//    4. Applications  — adds the demo trade-in / installment applications.
+//    2. Applications  — adds the demo trade-in / installment applications.
+//
+//  What it does NOT do: touch the product catalog. Products, prices and
+//  installment opt-ins are real (prisma/catalog-defs.ts) and are loaded by
+//  `npm --prefix server run catalog:sync`, so this script can never put a demo
+//  phone back on the live store.
 //
 //  What it will NEVER do:
 //    • delete or wipe anything, ever
@@ -30,21 +33,12 @@
 //  secret — don't commit it or share it):
 //      DATABASE_URL="<live-connection-string>" npm --prefix server run demo:data
 // ============================================================================
-import { Prisma, ProductStatus, ProductCondition, PaymentMethod, InventoryTxnType } from '@prisma/client';
+import { Prisma, PaymentMethod } from '@prisma/client';
 import { prisma, disconnectPrisma } from '../src/config/prisma';
 import { money } from '../src/utils/money';
 import { computeSchedule } from '../src/config/installment';
 import { dailyReferencePrefix, nextReferenceFrom } from '../src/utils/reference';
-import {
-  img,
-  skuFor,
-  BRANCH_DEFS,
-  INSTALLMENT_MIN_DOWN_PCT,
-  PRE_LOVED_DEMO,
-  PRE_LOVED_STOCK,
-  TRADE_IN_DEMOS,
-  INSTALLMENT_DEMOS,
-} from './demo-defs';
+import { BRANCH_DEFS, TRADE_IN_DEMOS, INSTALLMENT_DEMOS } from './demo-defs';
 
 const daysAgo = (n: number) => {
   const d = new Date();
@@ -115,149 +109,7 @@ async function main() {
     console.log(`   ✓ Branch created: ${b.name}`);
   }
 
-  // --- 2. Installment opt-in on existing products ---------------------------
-  // Only the two installment columns are written. Prices, names, descriptions,
-  // images, and variants are never touched.
-  let installmentEnabled = 0;
-  for (const [slug, minDownPct] of Object.entries(INSTALLMENT_MIN_DOWN_PCT)) {
-    // The pre-owned demo listing is step 3's job — it's created with these same
-    // flags already set, so don't report it as a missing product here.
-    if (slug === PRE_LOVED_DEMO.slug) continue;
-    const product = await prisma.product.findUnique({
-      where: { slug },
-      select: { id: true, name: true, installmentAvailable: true, installmentMinDownPct: true },
-    });
-    if (!product) {
-      console.log(`   • No product with slug "${slug}" — skipped (it may have been renamed or removed)`);
-      continue;
-    }
-    if (product.installmentAvailable && product.installmentMinDownPct === minDownPct) {
-      console.log(`   • ${product.name} already accepts installments — left untouched`);
-      continue;
-    }
-    await prisma.product.update({
-      where: { id: product.id },
-      data: { installmentAvailable: true, installmentMinDownPct: minDownPct },
-    });
-    installmentEnabled++;
-    console.log(`   ✓ Installments enabled: ${product.name} (min down ${minDownPct}%)`);
-  }
-
-  // --- 3. Pre-owned demo listing -------------------------------------------
-  const def = PRE_LOVED_DEMO;
-  let product = await prisma.product.findUnique({
-    where: { slug: def.slug },
-    select: { id: true, name: true, isPreOwned: true, installmentAvailable: true, installmentMinDownPct: true },
-  });
-
-  if (product) {
-    // Present already: only make sure the two flags this demo is meant to show
-    // are on. Price/description/images stay as the owner left them.
-    const minDownPct = INSTALLMENT_MIN_DOWN_PCT[def.slug] ?? 0;
-    const needsFlags =
-      !product.isPreOwned || !product.installmentAvailable || product.installmentMinDownPct !== minDownPct;
-    if (needsFlags) {
-      await prisma.product.update({
-        where: { id: product.id },
-        data: { isPreOwned: true, installmentAvailable: true, installmentMinDownPct: minDownPct },
-      });
-      console.log(`   ✓ ${product.name} already existed — flags refreshed (Pre-owned + installments)`);
-    } else {
-      console.log(`   • ${product.name} already exists — left untouched`);
-    }
-  } else {
-    const category = await prisma.category.findUnique({
-      where: { slug: def.categorySlug },
-      select: { id: true },
-    });
-    if (!category) {
-      throw new Error(
-        `No category with slug "${def.categorySlug}". Create it in Admin → Categories first, then re-run.`,
-      );
-    }
-    const created = await prisma.product.create({
-      data: {
-        name: def.name,
-        slug: def.slug,
-        model: def.model,
-        description: def.description,
-        highlights: def.highlights,
-        basePrice: money(def.storages[0]!.price),
-        discountPct: def.discountPct ?? 0,
-        status: ProductStatus.ACTIVE,
-        releaseYear: def.releaseYear,
-        isFeatured: def.flags?.isFeatured ?? false,
-        isNewArrival: def.flags?.isNewArrival ?? false,
-        isBestSeller: def.flags?.isBestSeller ?? false,
-        isDeal: def.flags?.isDeal ?? false,
-        isPreOwned: def.flags?.isPreOwned ?? false,
-        installmentAvailable: INSTALLMENT_MIN_DOWN_PCT[def.slug] !== undefined,
-        installmentMinDownPct: INSTALLMENT_MIN_DOWN_PCT[def.slug] ?? 0,
-        categoryId: category.id,
-        // Placeholder imagery only — no copyrighted product photos.
-        images: {
-          create: [
-            { url: img(def.name), alt: `${def.name} front`, position: 0 },
-            { url: img(`${def.name} back`), alt: `${def.name} back`, position: 1 },
-          ],
-        },
-      },
-      select: { id: true, name: true, isPreOwned: true, installmentAvailable: true, installmentMinDownPct: true },
-    });
-    product = created;
-    console.log(`   ✓ Product created: ${created.name}`);
-  }
-
-  // Variants: created per missing SKU. An existing SKU keeps its current stock —
-  // a re-run must never inflate on-hand units.
-  let variantsCreated = 0;
-  for (const storage of def.storages) {
-    for (const color of def.colors) {
-      const sku = skuFor(def.skuBase, storage.label, color.code);
-      const existing = await prisma.productVariant.findUnique({ where: { sku }, select: { id: true } });
-      if (existing) {
-        console.log(`   • Variant ${sku} already exists — stock left untouched`);
-        continue;
-      }
-      const stock = PRE_LOVED_STOCK[sku] ?? 1;
-      const variant = await prisma.productVariant.create({
-        data: {
-          sku,
-          storage: storage.label,
-          color: color.name,
-          colorHex: color.hex,
-          price: money(storage.price),
-          stock,
-          lowStockThreshold: def.lowStockThreshold ?? 5,
-          imageUrl: img(`${def.name} ${color.name}`),
-          condition: def.unit?.condition ?? ProductCondition.NEW,
-          batteryHealth: def.unit?.batteryHealth ?? null,
-          conditionNote: def.unit?.conditionNote ?? null,
-          productId: product.id,
-        },
-      });
-      variantsCreated++;
-
-      // Stock never appears without a ledger entry — and because this only runs
-      // for a NEWLY created variant, a re-run adds no phantom restock.
-      if (stock > 0) {
-        await prisma.inventoryTransaction.create({
-          data: {
-            variantId: variant.id,
-            type: InventoryTxnType.RESTOCK,
-            previousStock: 0,
-            quantityChanged: stock,
-            newStock: stock,
-            reason: 'Initial stock (demo data)',
-            adminId: admin?.id ?? null,
-          },
-        });
-      }
-      console.log(`   ✓ Variant created: ${sku} — ${stock} on hand`);
-    }
-  }
-
-  // --- 4. Demo trade-in applications ---------------------------------------
+  // --- 2. Demo trade-in applications ---------------------------------------
   // Deduped on the demo customer email (stable across runs and across days,
   // unlike the date-derived reference).
   let tradeInsCreated = 0;
@@ -300,7 +152,7 @@ async function main() {
     console.log(`   ✓ Trade-in ${reference} — ${t.customerName} (${t.status})`);
   }
 
-  // --- 5. Demo installment plans -------------------------------------------
+  // --- 3. Demo installment plans -------------------------------------------
   let plansCreated = 0;
   for (const p of INSTALLMENT_DEMOS) {
     const already = await prisma.installmentPlan.findFirst({
@@ -314,7 +166,14 @@ async function main() {
 
     const variant = await prisma.productVariant.findUnique({
       where: { sku: p.sku },
-      select: { id: true, storage: true, color: true, price: true, product: { select: { name: true } } },
+      select: {
+        id: true,
+        storage: true,
+        color: true,
+        price: true,
+        installmentPrice: true,
+        product: { select: { name: true } },
+      },
     });
     if (!variant) {
       console.log(`   • No variant with SKU ${p.sku} — installment for ${p.customerName} skipped`);
@@ -323,8 +182,11 @@ async function main() {
 
     const appliedAt = daysAgo(p.daysAgo);
     const downPayment = money(p.downPayment);
-    // Price comes from the DB, and the schedule from the API's own function.
-    const { principal, monthlyAmount, rows } = computeSchedule(variant.price, p.termMonths, downPayment);
+    // A plan divides the INSTALLMENT base price, falling back to cash when the
+    // variant has none. Price comes from the DB, schedule from the API's own
+    // function — exactly what the apply endpoint does.
+    const financedPrice = variant.installmentPrice ?? variant.price;
+    const { principal, monthlyAmount, rows } = computeSchedule(financedPrice, p.termMonths, downPayment);
     if (principal.lessThanOrEqualTo(new Prisma.Decimal(0))) {
       console.log(`   • Down payment ≥ price for ${p.sku} — installment for ${p.customerName} skipped`);
       continue;
@@ -340,7 +202,7 @@ async function main() {
         // Snapshot at apply time — a later price change must not rewrite this plan.
         productName: variant.product.name,
         variantLabel: `${variant.storage} · ${variant.color}`,
-        productPrice: variant.price,
+        productPrice: financedPrice,
         variantId: variant.id,
         branchId: branches.get(p.branchSlug) ?? null,
         termMonths: p.termMonths,
@@ -379,10 +241,9 @@ async function main() {
 
   console.log('\n✅ Demo data added.');
   console.log(
-    `   Branches created: ${branchesCreated} · installment opt-ins set: ${installmentEnabled} · ` +
-      `pre-owned variants created: ${variantsCreated} · trade-ins: ${tradeInsCreated} · plans: ${plansCreated}`,
+    `   Branches created: ${branchesCreated} · trade-ins: ${tradeInsCreated} · plans: ${plansCreated}`,
   );
-  console.log('   Nothing was deleted, no prices changed, no stock adjusted.\n');
+  console.log('   Nothing was deleted, no products or prices changed, no stock adjusted.\n');
 }
 
 main()

@@ -110,6 +110,7 @@ interface ResolvedInstallment {
   productName: string;
   variantLabel: string;
   condition: string;
+  /** The financed base — `installmentPrice` if set, else the cash `price`. */
   price: Prisma.Decimal;
   minDownPayment: Prisma.Decimal;
   downPayment: Prisma.Decimal;
@@ -119,10 +120,11 @@ interface ResolvedInstallment {
 
 /**
  * Look the variant/product up in the DB and re-derive every money figure from
- * the stored price — the client's price/monthly are NEVER trusted. Enforces:
- * the product is buyable + installment-enabled, the term is allowed, and the
- * down payment sits in `[minDownPct·price, price)` so the financed principal is
- * strictly positive. Pure reads + arithmetic; throws ApiError on any violation.
+ * the stored installment base price — the client's price/monthly are NEVER
+ * trusted. Enforces: the product is buyable + installment-enabled, the term is
+ * allowed, and the down payment sits in `[minDownPct·price, price)` so the
+ * financed principal is strictly positive. Pure reads + arithmetic; throws
+ * ApiError on any violation.
  */
 async function resolveInstallment(
   variantId: string,
@@ -141,6 +143,7 @@ async function resolveInstallment(
       color: true,
       condition: true,
       price: true,
+      installmentPrice: true,
       isActive: true,
       product: {
         select: {
@@ -160,20 +163,22 @@ async function resolveInstallment(
     throw ApiError.unprocessable('This product is not available for installment.');
   }
 
-  // Authoritative price straight from the DB.
-  const price = variant.price;
+  // Authoritative price straight from the DB. Financing uses the INSTALLMENT base
+  // price, which the shop sets higher than the cash price; a variant without one
+  // (accessories, anything priced before the column existed) is financed at cash.
+  const price = variant.installmentPrice ?? variant.price;
   const minPct = variant.product.installmentMinDownPct; // 0..90 (validated on the product)
   const minDownPayment = money((price.toNumber() * minPct) / 100);
   const downPayment = money(downPaymentInput);
 
   if (downPayment.lessThan(minDownPayment)) {
     throw ApiError.unprocessable(
-      `Down payment must be at least ₱${minDownPayment.toFixed(2)} (${minPct}% of the price).`,
+      `Down payment must be at least ₱${minDownPayment.toFixed(2)} (${minPct}% of the installment price).`,
       { minDownPayment: minDownPayment.toNumber(), price: price.toNumber() },
     );
   }
   if (downPayment.greaterThanOrEqualTo(price)) {
-    throw ApiError.unprocessable('Down payment must be less than the product price.', {
+    throw ApiError.unprocessable('Down payment must be less than the installment price.', {
       price: price.toNumber(),
     });
   }
@@ -270,6 +275,8 @@ export async function createInstallment(input: CreateInstallmentBody): Promise<I
             customerPhone: input.customer.phone,
             productName: r.productName,
             variantLabel: r.variantLabel,
+            // Snapshot of the INSTALLMENT base at apply time — a later re-price
+            // must never rewrite a plan that's already running.
             productPrice: r.price,
             variantId: r.variantId,
             branchId: input.branchId ?? null,

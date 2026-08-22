@@ -8,7 +8,7 @@ export interface ProductColor {
 }
 
 /** Condition of a catalog variant — JLP sells brand-new AND pre-owned units. */
-export type ProductCondition = 'NEW' | 'OPEN_BOX' | 'PREOWNED' | 'REFURBISHED';
+export type ProductCondition = 'NEW' | 'STANDARD' | 'OPEN_BOX' | 'PREOWNED' | 'REFURBISHED';
 
 /** Card shape from GET /api/products (list). */
 export interface ProductCard {
@@ -31,6 +31,12 @@ export interface ProductCard {
   installmentAvailable: boolean;
   priceFrom: number;
   priceTo: number;
+  /**
+   * Cheapest INSTALLMENT base across the active variants — the figure a plan
+   * divides, which runs higher than the cash `priceFrom`. Null when the listing
+   * has no active variants.
+   */
+  installmentPriceFrom: number | null;
   image: string | null;
   imageAlt: string;
   storages: string[];
@@ -54,7 +60,10 @@ export interface ProductVariant {
   storage: string;
   color: string;
   colorHex: string | null;
+  /** Cash price — what you pay to buy this option outright. */
   price: number;
+  /** Installment BASE price. Null = this option is financed at its cash price. */
+  installmentPrice: number | null;
   image: string | null;
   stock: number;
   inStock: boolean;
@@ -88,6 +97,8 @@ export interface ProductDetail {
   installmentMinDownPct: number;
   priceFrom: number;
   priceTo: number;
+  /** Cheapest installment base across the active variants (null if there are none). */
+  installmentPriceFrom: number | null;
   totalStock: number;
   inStock: boolean;
   images: ProductImage[];

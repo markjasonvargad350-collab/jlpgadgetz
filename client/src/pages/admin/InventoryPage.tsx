@@ -15,7 +15,7 @@ import { DataTable } from '../../components/admin/ui/DataTable';
 import type { Column } from '../../components/admin/ui/DataTable';
 import { Pagination } from '../../components/admin/ui/Pagination';
 import { StockStatusBadge } from '../../components/admin/ui/StatusBadge';
-import { AdjustStockModal } from '../../components/admin/AdjustStockModal';
+import { AdjustStockModal, AdjustPermissionNote } from '../../components/admin/AdjustStockModal';
 import type { AdjustTarget } from '../../components/admin/AdjustStockModal';
 import { formatPHP } from '../../utils/format';
 import type { InventoryRow, InventoryParams, InventoryStatusFilter, InventorySort } from '../../types/admin';
@@ -40,7 +40,7 @@ const SORT_VALUES = SORTS.map((s) => s.value);
 
 export function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { isAdmin } = useAdminAuth();
+  const { admin, isAdmin } = useAdminAuth();
   useDocumentTitle('Inventory');
 
   const urlQ = searchParams.get('q') ?? '';
@@ -147,7 +147,9 @@ export function InventoryPage() {
             Adjust
           </button>
         ) : (
-          <span className="text-xs text-ink-soft">—</span>
+          <span className="text-xs text-ink-soft" title="Stock adjustments need an ADMIN sign-in.">
+            —
+          </span>
         ),
     },
   ];
@@ -218,6 +220,8 @@ export function InventoryPage() {
           </label>
         </div>
       </div>
+
+      {!isAdmin && <AdjustPermissionNote role={admin?.role ?? null} className="mb-4" />}
 
       <DataTable
         columns={columns}

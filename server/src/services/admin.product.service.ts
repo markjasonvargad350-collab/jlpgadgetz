@@ -56,6 +56,8 @@ function mapVariant(v: AdminDetailVariant) {
     color: v.color,
     colorHex: v.colorHex,
     price: v.price.toNumber(),
+    // Null = this option is financed at its cash price.
+    installmentPrice: v.installmentPrice?.toNumber() ?? null,
     stock: v.stock,
     reservedStock: v.reservedStock,
     soldQty: v.soldQty,
@@ -137,6 +139,7 @@ function mapVariantDetail(v: AdminVariantRow) {
     color: v.color,
     colorHex: v.colorHex,
     price: v.price.toNumber(),
+    installmentPrice: v.installmentPrice?.toNumber() ?? null,
     stock: v.stock,
     reservedStock: v.reservedStock,
     soldQty: v.soldQty,
@@ -155,6 +158,9 @@ function mapVariantDetail(v: AdminVariantRow) {
 }
 
 // ── Products ──
+
+/** Optional money: `null` and omitted both mean "no separate installment base". */
+const optionalMoney = (n: number | null | undefined) => (n != null ? money(n) : null);
 
 export async function listProductsAdmin(query: AdminProductQueryInput) {
   const where: Prisma.ProductWhereInput = {};
@@ -241,6 +247,7 @@ export async function createProduct(input: CreateProductInput, adminId?: string)
           color: v.color,
           colorHex: v.colorHex,
           price: money(v.price),
+          installmentPrice: optionalMoney(v.installmentPrice),
           stock: 0,
           lowStockThreshold: v.lowStockThreshold ?? 5,
           imageUrl: v.imageUrl,
@@ -374,6 +381,7 @@ export async function addVariant(productId: string, input: VariantCreateInput, a
         color: input.color,
         colorHex: input.colorHex,
         price: money(input.price),
+        installmentPrice: optionalMoney(input.installmentPrice),
         stock: 0,
         lowStockThreshold: input.lowStockThreshold ?? 5,
         imageUrl: input.imageUrl,
@@ -420,6 +428,7 @@ export async function updateVariant(id: string, input: VariantUpdateInput, admin
   if (input.color !== undefined) data.color = input.color;
   if (input.colorHex !== undefined) data.colorHex = input.colorHex;
   if (input.price !== undefined) data.price = money(input.price);
+  if (input.installmentPrice !== undefined) data.installmentPrice = optionalMoney(input.installmentPrice);
   if (input.lowStockThreshold !== undefined) data.lowStockThreshold = input.lowStockThreshold;
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl;
   if (input.isActive !== undefined) data.isActive = input.isActive;

@@ -51,7 +51,15 @@ const cardSelect = {
   variants: {
     where: { isActive: true },
     orderBy: { price: 'asc' },
-    select: { storage: true, color: true, colorHex: true, price: true, stock: true, condition: true },
+    select: {
+      storage: true,
+      color: true,
+      colorHex: true,
+      price: true,
+      installmentPrice: true,
+      stock: true,
+      condition: true,
+    },
   },
 } satisfies Prisma.ProductSelect;
 
@@ -85,6 +93,7 @@ const detailSelect = {
       color: true,
       colorHex: true,
       price: true,
+      installmentPrice: true,
       imageUrl: true,
       stock: true,
       lowStockThreshold: true,
@@ -195,6 +204,16 @@ function priceRange(variants: VariantRow[], fallback: Prisma.Decimal): { from: n
   return { from: Math.min(...prices), to: Math.max(...prices) };
 }
 
+/**
+ * Cheapest financing base across the active variants: `installmentPrice` where
+ * the shop set one (it runs higher than cash), else that variant's cash price.
+ * Null when a listing has no active variants, so the card just omits the line.
+ */
+function cheapestInstallmentBase(variants: VariantRow[]): number | null {
+  if (variants.length === 0) return null;
+  return Math.min(...variants.map((v) => (v.installmentPrice ?? v.price).toNumber()));
+}
+
 // Distinct conditions across a product's active variants (usually just ["NEW"],
 // but a product may carry a pre-owned variant alongside a new one). Lets the
 // storefront show a "Pre-owned" badge when any non-NEW variant exists.
@@ -225,6 +244,8 @@ function toCard(p: ProductCardRow) {
     installmentAvailable: p.installmentAvailable,
     priceFrom: from,
     priceTo: to,
+    // Cash prices above; this is what an installment plan divides.
+    installmentPriceFrom: cheapestInstallmentBase(p.variants),
     image: p.images[0]?.url ?? null,
     imageAlt: p.images[0]?.alt ?? p.name,
     storages: uniqueStorages(p.variants),
@@ -259,6 +280,7 @@ function toDetail(p: ProductDetailRow) {
     installmentMinDownPct: p.installmentMinDownPct,
     priceFrom: from,
     priceTo: to,
+    installmentPriceFrom: cheapestInstallmentBase(p.variants),
     totalStock,
     inStock: totalStock > 0,
     images: p.images.map((i) => ({ id: i.id, url: i.url, alt: i.alt ?? p.name, position: i.position })),
@@ -269,6 +291,8 @@ function toDetail(p: ProductDetailRow) {
       color: v.color,
       colorHex: v.colorHex,
       price: v.price.toNumber(),
+      // Null = this option is financed at its cash price (see installment.service).
+      installmentPrice: v.installmentPrice?.toNumber() ?? null,
       image: v.imageUrl,
       stock: v.stock,
       inStock: v.stock > 0,

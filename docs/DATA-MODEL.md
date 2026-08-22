@@ -2,6 +2,11 @@
 
 The database is PostgreSQL, modeled with Prisma ([`server/prisma/schema.prisma`](../server/prisma/schema.prisma)).
 A generated SQL snapshot lives in [`generated-schema.sql`](./generated-schema.sql) (for reviewers without a DB).
+Regenerate it **from `server/`** (the Prisma 7 CLI needs `prisma.config.ts` to find the schema — run from the repo root and it silently emits nothing):
+
+```bash
+cd server && npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script -o ../docs/generated-schema.sql
+```
 
 **18 entities · 12 enums · 18 foreign keys · 61 indexes.**
 
@@ -16,7 +21,8 @@ A generated SQL snapshot lives in [`generated-schema.sql`](./generated-schema.sq
 7. **Branches are locations, not warehouses.** A `Branch` is a customer-selectable shop — a preferred/pickup location and the point of contact for trade-ins and installments. The catalog and stock stay **global**: `Order.branchId`, `TradeIn.branchId`, and `InstallmentPlan.branchId` are all optional + `SetNull`, and none of them changes pricing or fulfilment. Once referenced, deactivate a branch via `isActive` instead of deleting it.
 8. **Condition is per-unit; the pre-owned badge is per-listing.** `ProductVariant.condition` (with `batteryHealth` / `conditionNote`) is the per-unit truth, and the variant uniqueness key is `(productId, storage, color, condition)` — so a NEW and a PREOWNED "256GB · Black" coexist as separate variants with separate SKUs. `Product.isPreOwned` is a separate merchandising flag (badge, homepage rail, catalog filter) and is deliberately independent of it.
 9. **Trade-in valuations are entered by staff, never derived.** The device fields on `TradeIn` are the customer's self-reported snapshot; `quotedValue` and `finalValue` are set by staff in the back-office as the request moves through `TradeInStatus`.
-10. **Installments are price ÷ months — no interest, no fees.** `InstallmentPlan.productPrice` is snapshotted at apply time and never overwritten; `principal = productPrice − downPayment` and `monthlyAmount = principal ÷ termMonths`, both computed and re-validated server-side. The `InstallmentPayment` schedule sums to exactly the principal (the last row absorbs rounding), and recording a payment updates its row — rows are never deleted.
+10. **Installments are price ÷ months — no interest, no fees.** The base is the variant's **installment price** (`ProductVariant.installmentPrice ?? price`, see 11). `InstallmentPlan.productPrice` snapshots it at apply time and is never overwritten; `principal = productPrice − downPayment` and `monthlyAmount = principal ÷ termMonths`, both computed and re-validated server-side. The `InstallmentPayment` schedule sums to exactly the principal (the last row absorbs rounding), and recording a payment updates its row — rows are never deleted.
+11. **A variant carries two prices: cash and installment.** `ProductVariant.price` is the cash price — the only figure checkout ever charges (`order.service.ts` snapshots it onto `OrderItem.unitPrice`). `installmentPrice` is the separate, higher base a monthly plan is divided from, because financing is paid over time; JLP's price list quotes both per unit. It is **nullable**, and every consumer reads `installmentPrice ?? price`, so accessories and any row created before the column existed finance at their cash price with no backfill. Only the installment path reads it — cash checkout never does, and the two are labelled distinctly everywhere in the UI so they can't be confused.
 
 ## ER diagram
 
@@ -105,6 +111,7 @@ erDiagram
         string color
         string colorHex
         decimal price
+        decimal installmentPrice
         int stock
         int reservedStock
         int soldQty
@@ -299,12 +306,12 @@ erDiagram
 | `InventoryTxnType` | RESTOCK · SALE · RETURN · ADJUSTMENT · CANCELLATION |
 | `NotificationType` | NEW_ORDER · LOW_STOCK · OUT_OF_STOCK · PAYMENT · SYSTEM |
 | `NotificationLevel` | INFO · SUCCESS · WARNING · ERROR |
-| `ProductCondition` | NEW · OPEN_BOX · PREOWNED · REFURBISHED |
+| `ProductCondition` | NEW · STANDARD · OPEN_BOX · PREOWNED · REFURBISHED |
 | `TradeInStatus` | SUBMITTED · REVIEWING · QUOTED · ACCEPTED · DECLINED · COMPLETED · CANCELLED |
 | `InstallmentStatus` | PENDING · APPROVED · ACTIVE · COMPLETED · REJECTED · CANCELLED |
 | `InstallmentPaymentStatus` | PENDING · PAID |
 
-`ProductCondition` is shared: it defaults to `NEW` on `ProductVariant` (the catalog) and to `PREOWNED` on `TradeIn` (a device being traded in). `InstallmentPayment.method` reuses `PaymentMethod`.
+`ProductCondition` is shared: it defaults to `NEW` on `ProductVariant` (the catalog) and to `PREOWNED` on `TradeIn` (a device being traded in). `STANDARD` is JLP's own shelf grading — a unit the shop has opened and tested, so it is offered on catalog variants but **excluded** from the customer-facing trade-in form (`tradein.validator.ts` narrows the enum), because it isn't a claim a seller can make about their own phone. `InstallmentPayment.method` reuses `PaymentMethod`.
 
 ## Referential actions (deletes)
 
