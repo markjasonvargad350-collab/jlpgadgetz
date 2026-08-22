@@ -14,6 +14,7 @@ import {
   Truck,
 } from 'lucide-react';
 import { formatPHP, formatDateTime } from '../utils/format';
+import { sized } from '../utils/image';
 import { getOrder } from '../services/orders';
 import { ApiError } from '../services/http';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -187,7 +188,7 @@ export function OrderConfirmationPage() {
               <li key={it.sku} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                 <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/60">
                   {it.image ? (
-                    <img src={it.image} alt={it.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    <img src={sized(it.image, 'sm')} alt={it.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={24} className="text-brand-300" />
                   )}

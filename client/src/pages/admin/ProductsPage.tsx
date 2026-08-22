@@ -13,6 +13,7 @@ import type { Column } from '../../components/admin/ui/DataTable';
 import { Pagination } from '../../components/admin/ui/Pagination';
 import { ProductStatusBadge } from '../../components/admin/ui/StatusBadge';
 import { formatPHP } from '../../utils/format';
+import { sized } from '../../utils/image';
 import type { AdminProductCard, AdminProductParams, AdminProductSort, ProductStatus } from '../../types/admin';
 
 const PAGE_SIZE = 20;
@@ -87,7 +88,7 @@ export function ProductsPage() {
         <div className="flex items-center gap-3">
           <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/70 ring-1 ring-white/70">
             {p.image ? (
-              <img src={p.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+              <img src={sized(p.image, 'sm')} alt="" className="h-full w-full object-cover" loading="lazy" />
             ) : (
               <ImageOff size={16} className="text-ink-soft" />
             )}

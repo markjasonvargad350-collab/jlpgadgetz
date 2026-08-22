@@ -17,6 +17,7 @@ import { useCart } from '../contexts/CartContext';
 import { useBranches } from '../hooks/useBranches';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
+import { sized } from '../utils/image';
 import { estimateDeliveryFee, FREE_DELIVERY_THRESHOLD } from '../config/order';
 import { createOrder } from '../services/orders';
 import { ApiError } from '../services/http';
@@ -412,7 +413,7 @@ export function CheckoutPage() {
               <li key={item.variantId} className="flex gap-3">
                 <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/60">
                   {item.image ? (
-                    <img src={item.image} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    <img src={sized(item.image, 'sm')} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={20} className="text-brand-300" />
                   )}

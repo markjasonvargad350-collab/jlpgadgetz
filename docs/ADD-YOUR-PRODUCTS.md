@@ -317,14 +317,21 @@ Photos are added **by URL** (there's no file upload yet):
 3. The **first image is the cover** shown on the store. Delete with the ✕ on the
    thumbnail.
 
-To get a URL for your own photos, upload them somewhere public first (your
-Facebook page's photo link, Google Drive with public sharing, Imgur, Cloudinary,
-etc.) and paste that link. Per-variant photos go in the variant's **Image URL**
+To get a URL for your own photos, upload them somewhere public first and paste
+the link. **Imgur is the best choice** — the store automatically asks Imgur for a
+smaller copy of an `i.imgur.com` photo depending on where it appears (640px wide
+on a shop card, 1024px on the product page), so a 12-card shop page downloads
+~340 KB of photos instead of ~2 MB. Other hosts work, but they get served at
+whatever size you uploaded. Per-variant photos go in the variant's **Image URL**
 box.
 
-> ⚠️ Use **your own photos** of your own units, or a placeholder such as
-> `https://placehold.co/800x800`. Don't paste Apple's official marketing images —
-> they're copyrighted.
+> 💡 Paste the **direct link to the image file** — it ends in `.jpg` or `.png`
+> (e.g. `https://i.imgur.com/abc1234.jpg`), not the page you view it on
+> (`imgur.com/gallery/…`). On Imgur: right-click the photo → *Copy image address*.
+> Upload at full size; no need to shrink anything first.
+
+> ⚠️ Use **your own photos** of your own units. Don't paste Apple's official
+> marketing images — they're copyrighted.
 
 ---
 

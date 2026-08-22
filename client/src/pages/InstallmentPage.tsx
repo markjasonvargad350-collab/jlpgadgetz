@@ -24,6 +24,7 @@ import { INSTALLMENT_TERMS, computeMonthly, minDownPayment } from '../config/ins
 import { CONDITION_LABELS } from '../config/condition';
 import { BUSINESS } from '../config/business';
 import { formatBranchLocation, formatDate, formatPHP, formatPHPExact } from '../utils/format';
+import { sized } from '../utils/image';
 import type { ProductCard, ProductDetail, ProductVariant } from '../types/api';
 import type { CreateInstallmentRequest, InstallmentDTO, InstallmentQuote } from '../types/installment';
 
@@ -340,7 +341,7 @@ export function InstallmentPage() {
                         <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/60">
                           {card.image ? (
                             <img
-                              src={card.image}
+                              src={sized(card.image, 'sm')}
                               alt={card.imageAlt}
                               loading="lazy"
                               decoding="async"

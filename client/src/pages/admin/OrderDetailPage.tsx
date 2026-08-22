@@ -13,6 +13,7 @@ import { OrderStatusBadge, PaymentStatusBadge } from '../../components/admin/ui/
 import { ConfirmDialog } from '../../components/admin/ui/ConfirmDialog';
 import { TrackingTimelineCard } from '../../components/tracking/TrackingTimeline';
 import { formatPHP, formatDate, formatDateTime, toDateInputValue } from '../../utils/format';
+import { sized } from '../../utils/image';
 import type { OrderStatus, PaymentMethod, ShipmentDTO } from '../../types/order';
 
 // Code-split: Leaflet + the map chunk load only when an order detail is opened.
@@ -332,7 +333,7 @@ export function OrderDetailPage() {
                 <li key={it.sku} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                   <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/60 ring-1 ring-white/70">
                     {it.image ? (
-                      <img src={it.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      <img src={sized(it.image, 'sm')} alt="" className="h-full w-full object-cover" loading="lazy" />
                     ) : (
                       <Smartphone size={22} className="text-brand-300" />
                     )}

@@ -4,6 +4,7 @@ import { ArrowRight, Minus, Plus, ShoppingBag, Smartphone, Trash2 } from 'lucide
 import { useCart } from '../contexts/CartContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
+import { sized } from '../utils/image';
 
 const WIDTH = 'mx-auto w-[min(100%-1.5rem,76rem)]';
 
@@ -53,7 +54,7 @@ export function CartPage() {
                   className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl bg-white/50"
                 >
                   {item.image ? (
-                    <img src={item.image} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                    <img src={sized(item.image, 'sm')} alt={item.productName} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : (
                     <Smartphone size={32} className="text-brand-300" />
                   )}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { CreditCard, Smartphone } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../types/api';
 import { formatPriceRange } from '../utils/format';
+import { sized } from '../utils/image';
 import { CONDITION_LABELS, sortConditions } from '../config/condition';
 
 /**
@@ -29,7 +30,7 @@ export function ProductCard({ product }: { product: ProductCardType }) {
         <div className="relative mb-4 grid aspect-square place-items-center overflow-hidden rounded-2xl bg-white/50">
           {product.image ? (
             <img
-              src={product.image}
+              src={sized(product.image, 'md')}
               alt={product.imageAlt}
               loading="lazy"
               decoding="async"

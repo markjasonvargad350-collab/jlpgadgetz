@@ -4,10 +4,11 @@ import { addImage, deleteImage } from '../../../services/adminProducts';
 import { ApiError } from '../../../services/http';
 import { Field, Input } from '../ui/Field';
 import { Spinner } from '../ui/Spinner';
+import { sized } from '../../../utils/image';
 import type { AdminImage } from '../../../types/admin';
 
 /** Edit-mode image manager: a thumbnail grid with per-image delete plus an
- *  add-by-URL form. Placeholder URLs only (no copyrighted Apple imagery). */
+ *  add-by-URL form. Images are URL references — there is no upload pipeline. */
 export function ImagesPanel({
   productId,
   images,
@@ -59,13 +60,16 @@ export function ImagesPanel({
   return (
     <div className="glass rounded-3xl p-6">
       <h3 className="font-display font-bold">Images</h3>
-      <p className="mt-1 text-sm text-ink-soft">Use placeholder URLs (e.g. placehold.co). The first image is the cover.</p>
+      <p className="mt-1 text-sm text-ink-soft">
+        Paste a direct link to the image file. The first image is the cover. Full-size photos are fine — Imgur links
+        (<span className="font-mono text-xs">i.imgur.com/…</span>) are downscaled for you when the page renders.
+      </p>
 
       {images.length > 0 ? (
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {images.map((img) => (
             <div key={img.id} className="group relative aspect-square overflow-hidden rounded-2xl bg-white/70 ring-1 ring-white/70">
-              <img src={img.url} alt={img.alt ?? ''} className="h-full w-full object-cover" loading="lazy" />
+              <img src={sized(img.url, 'sm')} alt={img.alt ?? ''} className="h-full w-full object-cover" loading="lazy" />
               <button
                 onClick={() => handleRemove(img.id)}
                 disabled={removingId === img.id}
@@ -87,7 +91,7 @@ export function ImagesPanel({
       <form onSubmit={handleAdd} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
           <Field label="Image URL" htmlFor="img-url">
-            <Input id="img-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://placehold.co/800x800" />
+            <Input id="img-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://i.imgur.com/abc1234.jpg" />
           </Field>
         </div>
         <div className="sm:w-48">

@@ -19,6 +19,7 @@ import { useProduct } from '../hooks/useProduct';
 import { useCart } from '../contexts/CartContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatPHP } from '../utils/format';
+import { sized, srcSetFor } from '../utils/image';
 import { CONDITION_LABELS, sortConditions } from '../config/condition';
 import type { ProductColor, ProductCondition, ProductVariant } from '../types/api';
 
@@ -212,7 +213,16 @@ export function ProductPage() {
             className="glass grid aspect-square place-items-center overflow-hidden rounded-3xl bg-white/50"
           >
             {mainSrc ? (
-              <img src={mainSrc} alt={product.name} className="h-full w-full object-cover" />
+              <img
+                src={sized(mainSrc, 'lg')}
+                srcSet={srcSetFor(mainSrc)}
+                sizes="(min-width: 1024px) 45vw, 100vw"
+                alt={product.name}
+                // The page's largest paint — tell the browser to fetch it ahead
+                // of the lazy thumbnails rather than in document order.
+                fetchPriority="high"
+                className="h-full w-full object-cover"
+              />
             ) : (
               <Smartphone size={96} className="text-brand-300" />
             )}
@@ -229,7 +239,7 @@ export function ProductPage() {
                   }`}
                   aria-label={`View image ${i + 1}`}
                 >
-                  <img src={img.url} alt={img.alt} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                  <img src={sized(img.url, 'sm')} alt={img.alt} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </button>
               ))}
             </div>

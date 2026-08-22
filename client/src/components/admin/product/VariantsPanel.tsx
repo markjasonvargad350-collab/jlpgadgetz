@@ -255,7 +255,7 @@ function VariantFormModal({
 
         <div className={isEdit ? '' : 'sm:col-span-2'}>
           <Field label="Image URL" htmlFor="v-img" hint="Optional per-variant image.">
-            <Input id="v-img" value={form.imageUrl} onChange={(e) => patch({ imageUrl: e.target.value })} placeholder="https://placehold.co/800x800" />
+            <Input id="v-img" value={form.imageUrl} onChange={(e) => patch({ imageUrl: e.target.value })} placeholder="https://i.imgur.com/abc1234.jpg" />
           </Field>
         </div>
 
